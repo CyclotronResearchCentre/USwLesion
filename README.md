@@ -1,2 +1,2 @@
-# US4Lesion
+# UniSegmLesion
 Unified Segmentation for lesioned brain
