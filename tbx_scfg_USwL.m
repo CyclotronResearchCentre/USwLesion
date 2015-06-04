@@ -1,0 +1,163 @@
+function USwL = tbx_scfg_USwL
+
+
+%% Input definitions
+%_______________________________________________________________________
+
+% ---------------------------------------------------------------------
+% imgMsk Mask image
+% ---------------------------------------------------------------------
+imgMsk         = cfg_files;
+imgMsk.tag     = 'imgMsk';
+imgMsk.name    = 'Mask image';
+imgMsk.help    = {'Select the "lesiosn mask" image.'};
+imgMsk.filter = 'image';
+imgMsk.ufilter = '.*';
+imgMsk.num     = [1 1];
+
+% ---------------------------------------------------------------------
+% imgRef Structural reference image
+% ---------------------------------------------------------------------
+imgRef         = cfg_files;
+imgRef.tag     = 'imgRef';
+imgRef.name    = 'Structural reference image';
+imgRef.help    = {'Select the structural reference image.'};
+imgRef.filter = 'image';
+imgRef.ufilter = '.*';
+imgRef.num     = [1 1];
+
+% ---------------------------------------------------------------------
+% imgMPM Structural quantitative images
+% ---------------------------------------------------------------------
+imgMPM         = cfg_files;
+imgMPM.tag     = 'imgMPM';
+imgMPM.name    = 'Structural quantitative images';
+imgMPM.help    = {'Select the structural quantitative (MPM-VBQ) images.'};
+imgMPM.filter = 'image';
+imgMPM.ufilter = '.*';
+imgMPM.num     = [0 Inf];
+imgMPM.val       = {''};
+
+% ---------------------------------------------------------------------
+% imgOth Other structural images
+% ---------------------------------------------------------------------
+imgOth         = cfg_files;
+imgOth.tag     = 'imgOth';
+imgOth.name    = 'Other structural images';
+imgOth.help    = {'Select the other structural (e.g. FLAIR) images.'};
+imgOth.filter = 'image';
+imgOth.ufilter = '.*';
+imgOth.num     = [0 Inf];
+imgOth.val       = {''};
+
+% ---------------------------------------------------------------------
+% img4US Images to use for the segmentation
+% ---------------------------------------------------------------------
+img4US         = cfg_menu;
+img4US.tag     = 'img4US';
+img4US.name    = 'Images to use for the segmentation';
+img4US.help    = {'Choose which image(s) are used for the segmentation'};
+img4US.labels = {
+    'Structural reference only'
+    'all MPMs [DEF]'
+    'all MPMs + others'
+    }';
+img4US.values = {0 1 2};
+img4US.val    = {1};
+
+% ---------------------------------------------------------------------
+% tpm4lesion Tissue probability map(s) affected by the lesion
+% ---------------------------------------------------------------------
+tpm4lesion         = cfg_menu;
+tpm4lesion.tag     = 'tpm4lesion';
+tpm4lesion.name    = 'Tissue probability map(s) affected by the lesion';
+tpm4lesion.help    = {'Choose which TPM(s) is/are modified by the lesion'};
+tpm4lesion.labels = {
+    'WM [DEF]'
+    'GM'
+    'WM+GM'
+    }';
+tpm4lesion.values = {0 1 2};
+tpm4lesion.val    = {0};
+
+% ---------------------------------------------------------------------
+% options Options
+% ---------------------------------------------------------------------
+options         = cfg_branch;
+options.tag     = 'options';
+options.name    = 'Options';
+options.val     = {img4US tpm4lesion};
+options.help    = {'azerzaer'};
+%_______________________________________________________________________
+
+%% EXEC function
+% ---------------------------------------------------------------------
+% USwL Unified segmentation with lesion mas
+% ---------------------------------------------------------------------
+USwL         = cfg_exbranch;
+USwL.tag     = 'uswl';
+USwL.name    = 'Unified segmentation with lesion mask';
+USwL.val     = {imgMsk imgRef imgMPM imgOth options};
+USwL.help    = {['Unified segmentation for images with lesions when an ',...
+    'approximate mask is also provided. This mask is turned into a ',...
+    '"tissue probability map" and added to SPM''s usual TPMs to form ',...
+    'a subject-specific set of TPMs. Then "Unified Segmentation ',...
+    'is applied.'],...
+    '',...
+    'All images are assumed to be already coregistered'};
+USwL.prog = @crc_USwL;
+USwL.vout = @vout_USwL;
+
+end
+
+%% OUTPUT functions
+%_______________________________________________________________________
+function dep = vout_USwL(job) %#ok<*INUSD>
+
+cdep = cfg_dep;
+cdep.sname      = 'Subject''s TPM with Lesion';
+cdep.src_output = substruct('.','TPMl');
+cdep.tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+
+if ~isempty(job.imgMPM)
+    cdep(end+1)          = cfg_dep;
+    cdep(end).sname      = 'Warped MPM images';
+    cdep(end).src_output = substruct('.','wMPM');
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+end
+
+if ~isempty(job.imgOth)
+    cdep(end+1)          = cfg_dep;
+    cdep(end).sname      = 'Warped other images';
+    cdep(end).src_output = substruct('.','wOth');
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+end
+
+% Segmented images in subject space
+for ii=1:4
+    cdep(end+1)          = cfg_dep;
+    cdep(end).sname      = sprintf('c%d image',ii);
+    cdep(end).src_output = substruct('.','segmImg','.',['c',num2str(ii)]);
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+end
+
+% Warped segmented images
+for ii=1:4
+    cdep(end+1)          = cfg_dep;
+    cdep(end).sname      = sprintf('wc%d image',ii);
+    cdep(end).src_output = substruct('.','segmImg','.',['wc',num2str(ii)]);
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+end
+
+% Modulated warped segmented images
+for ii=1:4
+    cdep(end+1)          = cfg_dep;
+    cdep(end).sname      = sprintf('mwc%d image',ii);
+    cdep(end).src_output = substruct('.','segmImg','.',['mwc',num2str(ii)]);
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+end
+
+dep = cdep;
+
+end
+%_______________________________________________________________________
