@@ -1,21 +1,50 @@
 function fn_out = crc_MPMsmooth(job)
 
-fn_wMPM = job.wMPM;
-fn_mwTC = job.wcImg;
+testing  = true;
 
-tpm = spm_file(job.tpm_l,'number','');
-fn_lTPM = char( [tpm,',1'], [tpm,',2'], [tpm,',3'] );
-
-opt_process = struct( ...
-    'fwhm', job.fwhm, ...
-    'tpm', fn_lTPM);
-
-% Do it!
-% fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
-fn_out = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
-
-% % Prepare output
-% nMPM = size(fn_wMPM,1);
+if ~testing
+    
+    fn_wMPM = char(job.wMPM);
+    fn_mwTC = spm_file(char(job.wcImg),'number','');
+    
+    % Find list of tissue classes, tc_ind
+    tc_ind = [];
+    for ii = 1:size(fn_mwTC,1)
+        p = strfind(deblank(fn_mwTC(ii,:)),'wc');
+        tc_ind = [tc_ind str2double(deblank(fn_mwTC(ii,p+2)))]; %#ok<*AGROW>
+    end
+    
+    % Collect the TPM_l
+    tpm = spm_file(char(job.tpm_l),'number','');
+    fn_lTPM = char;
+    for ii = tc_ind
+        fn_lTPM = char( fn_lTPM , [tpm,',',num2str(ii)]);
+    end
+    fn_lTPM(1,:) = [];
+    
+    opt_process = struct( ...
+        'fwhm', job.fwhm, ...
+        'tpm', fn_lTPM) ; % , ...
+    
+    % Do it!
+    % fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
+    fn_out.fn = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
+    
+else
+    tmp1 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_MT_EPIB1.nii'
+            'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_MT_EPIB1.nii'
+            'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_MT_EPIB1.nii'};
+    tmp2 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_R1_EPIB1.nii'
+            'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_R1_EPIB1.nii'
+            'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_R1_EPIB1.nii'};
+    tmp3 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_R2s.nii'
+            'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_R2s.nii'
+            'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_R2s.nii'};
+    tmp4 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'
+            'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'
+            'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'};
+    fn_out.fn = {tmp1 tmp2 tmp3 tmp4}    ;
+end
 
 end
 
@@ -28,11 +57,11 @@ function fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt)
 % FORMAT fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_TC, opt)
 %
 % Applyin the "Bogdan treatment" (*) on MPM images that were processed
-% with 'unified segmentation' and NOT Dartel (as is usual). 
+% with 'unified segmentation' and NOT Dartel (as is usual).
 % This is necessary when dealing with patients with brain lesions as GM and
 % WM are affected and cannot be properly aligned across subjects.
 %
-% Since the number of tissue classes is 2 (GM+WM) or 3 (GM+WM+lesion), one 
+% Since the number of tissue classes is 2 (GM+WM) or 3 (GM+WM+lesion), one
 % should be a bit careful how things are processed.
 %
 % INPUT:
@@ -42,14 +71,15 @@ function fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt)
 %   .fwhm   : kernel size for smoothing
 %   .tpm    : tissue probability maps to use, with full path!
 %             And one per tissue class passed!
+%   .tc_ind : index of tissue classes to be considered, e.g. [1 2 3] for
+%             the 1st three classes (e.g. GM/WM/Lesion for the case of
+%             brain image with lesion)
 %
 % OUTPUT:
 % - fn_finMPM : filename of the "smoothed tissue masked MPMs".
 %
-% NOTE: I'm assuming that 2 or 3 tissue classes are used, no more no less.
-% 
-% (*) smoothing and scaling to account for partial volume effect on a 
-% series of multi-parametric map, e.g. MT, R1, R2*, based on the tissue 
+% (*) smoothing and scaling to account for partial volume effect on a
+% series of multi-parametric map, e.g. MT, R1, R2*, based on the tissue
 % classes, e.g. GM, WM and lesions.
 %__________________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
@@ -62,7 +92,7 @@ fn_TPM = opt.tpm;
 nMPM = size(fn_wMPM,1);
 nTC  = size(fn_mwTC,1);
 nTPM = size(fn_TPM,1);
-if nTC<2 || nTC>3 || nTC~=nTPM
+if nTC~=nTPM
     error('VBQ:MPM','Wrong number of tissue classes!')
 end
 
@@ -84,7 +114,7 @@ for ii=1:nMPM
             '(i1.*i2).*(i3>0.05)',ic_flag);
         p{jj} = p_tmp.fname;
     end
-
+    
     % Smooth TC -> ssmwc1 images
     m = cell(nTC,1);
     for jj=1:nTC
@@ -96,7 +126,7 @@ for ii=1:nMPM
     n = cell(nTC,1);
     for jj=1:nTC
         n{jj} = spm_file(p{jj},'prefix','s');
-        spm_smooth(p{jj},n{jj},opt.fwhm); 
+        spm_smooth(p{jj},n{jj},opt.fwhm);
     end
     
     % calculate signal, as in paper + masking smoothed TC>.05
@@ -107,7 +137,8 @@ for ii=1:nMPM
             '(i1./i2).*(i3>0.05)',ic_flag);
     end
     
-    fn_finMPM{ii} = char(q);
+    %     fn_finMPM{ii} = char(q); % saved as char array
+    fn_finMPM{ii} = q; % saved as cell array
     fn_2delete = (char(char(p),char(m),char(n)));
     for jj=1:size(fn_2delete,1)
         delete(deblank(fn_2delete(jj,:)));

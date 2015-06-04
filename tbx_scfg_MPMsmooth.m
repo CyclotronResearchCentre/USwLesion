@@ -8,7 +8,7 @@ wMPM.tag     = 'wMPM';
 wMPM.name    = 'Warped structural quantitative images';
 wMPM.help    = {'Select the warped structural quantitative images.'};
 wMPM.filter = 'image';
-wMPM.ufilter = '^w.*';
+wMPM.ufilter = '^ws.*';
 wMPM.num     = [1 Inf];
 % wMPM.val       = {''};
 
@@ -28,22 +28,33 @@ wcImg.num     = [2 3];
 % ---------------------------------------------------------------------
 tpm_l         = cfg_files;
 tpm_l.tag     = 'tpm_l';
-tpm_l.name    = 'Warped tissue class images';
+tpm_l.name    = 'Subject''s TPM with lesion class';
 tpm_l.help    = {'Subject''s TPM with lesion class.'};
 tpm_l.filter = 'image';
 tpm_l.ufilter = 'TPM.*';
 tpm_l.num     = [1 1];
 
 %--------------------------------------------------------------------------
-% smooth Smoothing kernel
+% fwhm FWHM of smoothing kernel
 %--------------------------------------------------------------------------
-smooth         = cfg_entry;
-smooth.tag     = 'smooth';
-smooth.name    = 'Smoothing kernel';
-smooth.help    = {'Size of smoothing kernel to be applied'};
-smooth.strtype = 'r';
-smooth.num     = [1 1];
-smooth.val     = {8};
+fwhm         = cfg_entry;
+fwhm.tag     = 'fwhm';
+fwhm.name    = 'FWHM of smoothing kernel';
+fwhm.help    = {'FWHM of smoothing kernel to be applied'};
+fwhm.strtype = 'r';
+fwhm.num     = [1 1];
+fwhm.val     = {8};
+
+% %--------------------------------------------------------------------------
+% % tc_ind Index of tissue classes to extract
+% %--------------------------------------------------------------------------
+% tc_ind         = cfg_entry;
+% tc_ind.tag     = 'tc_ind';
+% tc_ind.name    = 'Index of tissue classes to extract';
+% tc_ind.help    = {'Index of tissue classes to extract'};
+% tc_ind.strtype = 'r';
+% tc_ind.num     = [1 4];
+% tc_ind.val     = {1:3};
 
 
 %% EXEC function
@@ -54,7 +65,8 @@ smooth.val     = {8};
 MPMsmooth        = cfg_exbranch;
 MPMsmooth.tag    = 'MPMsmooth';
 MPMsmooth.name   = 'Partial volume smoothing';
-MPMsmooth.val    = {wMPM wcImg tpm_l smooth};
+MPMsmooth.val    = {wMPM wcImg tpm_l fwhm};
+% MPMsmooth.val    = {wMPM tpm_l fwhm tc_ind};
 MPMsmooth.help   = {['Applying tissue spcific smoothing in order to',...
     'limit partial volume effect. This is specifically useful for ',...
     'the quantitative MPM images.']};
@@ -66,10 +78,30 @@ end
 %% OUTPUT function
 %_______________________________________________________________________
 function dep = vout_MPMsmoothn(job) %#ok<*INUSD>
-dep            = cfg_dep;
-dep.sname      = 'Velocity Kernel';
-dep.src_output = substruct('.','fname','()',{':'});
-dep.tgt_spec   = cfg_findspec({{'filter','mat'}});
-end%_______________________________________________________________________
+
+img_c = 0;
+% for ii=1:numel(job.wMPM)
+%     for jj=1:numel(job.wcImg)
+%         img_c = img_c+1;
+%         cdep(img_c) = cfg_dep; %#ok<*AGROW>
+%         cdep(img_c).sname  = sprintf('fin%d_c%d image',[ii jj]);
+%         cdep(img_c).src_output =  ...
+%             substruct('.','fn','{}',['{',num2str(ii),'}'],'{}',['{',num2str(jj),'}']);
+%     end
+% end
+for ii=1:numel(job.wMPM)
+    for jj=1:numel(job.wcImg)
+        img_c = img_c+1;
+        cdep(img_c) = cfg_dep; %#ok<*AGROW>
+        cdep(img_c).sname  = sprintf('fin%d_c%d image',[ii jj]);
+        cdep(img_c).src_output =  ...
+            substruct('.','fn','{}',{ii},'{}',{jj});
+        cdep(img_c).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+    end
+end
+
+dep = cdep;
+end
+%_______________________________________________________________________
 
 
