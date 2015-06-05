@@ -1,6 +1,7 @@
 function fn_out = crc_MPMsmooth(job)
 
 testing  = true;
+% testing  = false;
 
 if ~testing
     
@@ -31,18 +32,33 @@ if ~testing
     fn_out.fn = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
     
 else
-    tmp1 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_MT_EPIB1.nii'
+    if ispc
+        tmp1 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_MT_EPIB1.nii'
             'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_MT_EPIB1.nii'
             'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_MT_EPIB1.nii'};
-    tmp2 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_R1_EPIB1.nii'
+        tmp2 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_R1_EPIB1.nii'
             'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_R1_EPIB1.nii'
             'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_R1_EPIB1.nii'};
-    tmp3 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_R2s.nii'
+        tmp3 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_R2s.nii'
             'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_R2s.nii'
             'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_R2s.nii'};
-    tmp4 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'
+        tmp4 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'
             'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'
             'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'};
+    else
+        tmp1 = {'/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p1_ws7480-0005-00001-000176-00_MT_EPIB1.nii'
+            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p2_ws7480-0005-00001-000176-00_MT_EPIB1.nii'
+            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p3_ws7480-0005-00001-000176-00_MT_EPIB1.nii'};
+        tmp2 = {'/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p1_ws7480-0005-00001-000176-00_R1_EPIB1.nii'
+            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p2_ws7480-0005-00001-000176-00_R1_EPIB1.nii'
+            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p3_ws7480-0005-00001-000176-00_R1_EPIB1.nii'};
+        tmp3 = {'/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p1_ws7480-0005-00001-000176-00_R2s.nii'
+            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p2_ws7480-0005-00001-000176-00_R2s.nii'
+            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p3_ws7480-0005-00001-000176-00_R2s.nii'};
+        tmp4 = {'/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p1_ws7480-0005-00001-000176-00_A_EPIB1_flat.nii'
+            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p2_ws7480-0005-00001-000176-00_A_EPIB1_flat.nii'
+            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p3_ws7480-0005-00001-000176-00_A_EPIB1_flat.nii'};        
+    end
     fn_out.fn = {tmp1 tmp2 tmp3 tmp4}    ;
 end
 

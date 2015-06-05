@@ -45,18 +45,6 @@ fwhm.strtype = 'r';
 fwhm.num     = [1 1];
 fwhm.val     = {8};
 
-% %--------------------------------------------------------------------------
-% % tc_ind Index of tissue classes to extract
-% %--------------------------------------------------------------------------
-% tc_ind         = cfg_entry;
-% tc_ind.tag     = 'tc_ind';
-% tc_ind.name    = 'Index of tissue classes to extract';
-% tc_ind.help    = {'Index of tissue classes to extract'};
-% tc_ind.strtype = 'r';
-% tc_ind.num     = [1 4];
-% tc_ind.val     = {1:3};
-
-
 %% EXEC function
 %----------------------------------------------------------------------
 % MPMsmooth Partial volume smoothing, accounting for specific tissue 
@@ -80,23 +68,15 @@ end
 function dep = vout_MPMsmoothn(job) %#ok<*INUSD>
 
 img_c = 0;
-% for ii=1:numel(job.wMPM)
-%     for jj=1:numel(job.wcImg)
-%         img_c = img_c+1;
-%         cdep(img_c) = cfg_dep; %#ok<*AGROW>
-%         cdep(img_c).sname  = sprintf('fin%d_c%d image',[ii jj]);
-%         cdep(img_c).src_output =  ...
-%             substruct('.','fn','{}',['{',num2str(ii),'}'],'{}',['{',num2str(jj),'}']);
-%     end
-% end
 for ii=1:numel(job.wMPM)
     for jj=1:numel(job.wcImg)
         img_c = img_c+1;
         cdep(img_c) = cfg_dep; %#ok<*AGROW>
         cdep(img_c).sname  = sprintf('fin%d_c%d image',[ii jj]);
         cdep(img_c).src_output =  ...
-            substruct('.','fn','{}',{ii},'{}',{jj});
-        cdep(img_c).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+            substruct('.','fn','{}',{ii},'()',{jj});
+%         cdep(img_c).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+        cdep(img_c).tgt_spec = cfg_findspec({{'filter','nifti'}});
     end
 end
 
