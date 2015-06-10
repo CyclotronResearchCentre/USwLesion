@@ -116,45 +116,67 @@ function dep = vout_USwL(job) %#ok<*INUSD>
 
 cdep = cfg_dep;
 cdep.sname      = 'Subject''s TPM with Lesion';
-cdep.src_output = substruct('.','TPMl','()',{jj});
-cdep.tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+cdep.src_output = substruct('.','TPMl');
+% cdep.tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+cdep.tgt_spec   = cfg_findspec({{'filter','nifti'}});
 
 if ~isempty(job.imgMPM)
-    cdep(end+1)          = cfg_dep;
-    cdep(end).sname      = 'Warped MPM images';
-    cdep(end).src_output = substruct('.','wMPM','()',{jj});
-    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+    for ii=1:numel(job.imgMPM)
+        cdep(end+1)          = cfg_dep;
+        cdep(end).sname      = sprintf('Warped MPM image #%d',ii);
+%     cdep(end).src_output = substruct('.','wMPM','()',{jj});
+        cdep(end).src_output = substruct('.',['wMPM',num2str(ii)]);
+        cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+    end
 end
 
+% if ~isempty(job.imgMPM)
+%     cdep(end+1)          = cfg_dep;
+%     cdep(end).sname      = 'Warped MPM images';
+% %     cdep(end).src_output = substruct('.','wMPM','()',{jj});
+%     cdep(end).src_output = substruct('.','wMPM','{}',':');
+%     cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+% %     cdep(end).tgt_spec   = cfg_findspec({'filter','image','strtype','e'});
+% %     cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+% end
+% 
 if ~isempty(job.imgOth)
     cdep(end+1)          = cfg_dep;
     cdep(end).sname      = 'Warped other images';
-    cdep(end).src_output = substruct('.','wOth','()',{jj});
-    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+%     cdep(end).src_output = substruct('.','wOth','()',{jj});
+    cdep(end).src_output = substruct('.','wOth');
+%     cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
 
 % Segmented images in subject space
 for ii=1:4
     cdep(end+1)          = cfg_dep;
     cdep(end).sname      = sprintf('c%d image',ii);
-    cdep(end).src_output = substruct('.','segmImg','.',['c',num2str(ii)],'()',{jj});
-    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+%     cdep(end).src_output = substruct('.','segmImg','.',['c',num2str(ii)],'()',{jj});
+    cdep(end).src_output = substruct('.','segmImg','.',['c',num2str(ii)]);
+%     cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
 
 % Warped segmented images
 for ii=1:4
     cdep(end+1)          = cfg_dep;
     cdep(end).sname      = sprintf('wc%d image',ii);
-    cdep(end).src_output = substruct('.','segmImg','.',['wc',num2str(ii)],'()',{jj});
-    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+%     cdep(end).src_output = substruct('.','segmImg','.',['wc',num2str(ii)],'()',{jj});
+    cdep(end).src_output = substruct('.','segmImg','.',['wc',num2str(ii)]);
+%     cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
 
 % Modulated warped segmented images
 for ii=1:4
     cdep(end+1)          = cfg_dep;
     cdep(end).sname      = sprintf('mwc%d image',ii);
-    cdep(end).src_output = substruct('.','segmImg','.',['mwc',num2str(ii)],'()',{jj});
-    cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+%     cdep(end).src_output = substruct('.','segmImg','.',['mwc',num2str(ii)],'()',{jj});
+    cdep(end).src_output = substruct('.','segmImg','.',['mwc',num2str(ii)]);
+%     cdep(end).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
 
 dep = cdep;
