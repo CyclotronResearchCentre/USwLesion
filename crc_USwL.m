@@ -95,20 +95,16 @@ if ~testing
         spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
         spm_file(fn_in{3}(1,:),'prefix','smwc3') );
     
-    %% 8. Collect all the image filenames created
-    % and output them in reverse order
-    % fn_out{1} = fn_warped_MPM; % warped MPMs
-    % fn_out{2} = fn_warped_Oth; % warped Others
-    % fn_out{3} = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
-    % fn_out{4} = spm_select('FPList',pth,'^rc[0-9].*\.nii$'); % Dartel imported segmented tissues
-    % fn_out{5} = fn_TPMl;  % new TPM with the lesion
-    % fn_out{6} = char(fn_tMsk,fn_wtMsk,fn_swtMsk); % native, warped and smooth-warped cleaned mask
-    
-    if ~isempty(fn_warped_MPM)
-        fn_out.wMPM = {fn_warped_MPM}; % warped MPMs
+    %% 8. Collect all the image filenames created    
+    if ~isempty(fn_warped_MPM) % warped MPMs
+        for ii=1:size(fn_warped_MPM,1)
+          fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
+        end
     end
     if ~isempty(fn_warped_Oth)
-        fn_out.wOth = {fn_warped_Oth}; % warped Others
+        for ii=1:size(fn_warped_MPM,1) % warped Others
+          fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
+        end
     end
     tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
     fn_out.segmImg.c1 = {deblank(tmp(1,:))}; % GM
@@ -135,16 +131,14 @@ else
     if ~isempty(fn_in{3})
         fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
         for ii=1:size(fn_warped_MPM,1)
-%           fn_out = setfield(fn_out,['wMPM',num2str(ii)],{deblank(fn_warped_MPM(ii,:))};
           fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
         end
-%         fn_out.wMPM = {fn_warped_MPM}; % warped MPMs
-%         fn_out.wMPM = {cellstr(fn_warped_MPM)}; % warped MPMs
     end
     if ~isempty(fn_in{4})
         fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
-%         fn_out.wOth = {fn_warped_Oth}; % warped Others
-        fn_out.wOth = {cellstr(fn_warped_Oth)}; % warped Others
+        for ii=1:size(fn_warped_MPM,1)
+          fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
+        end
     end
     tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
     fn_out.segmImg.c1 = {deblank(tmp(1,:))}; % GM
@@ -165,8 +159,6 @@ else
     fn_out.TPMl = {fn_TPMl};
 end
 end
-
-
 
 %% =======================================================================
 %% SUBFUNCTIONS
