@@ -20,7 +20,8 @@ wcImg.tag     = 'wcImg';
 wcImg.name    = 'Warped tissue class images';
 wcImg.help    = {'Select the warped tissue classes.'};
 wcImg.filter = 'image';
-wcImg.ufilter = '^smwc.*';
+% wcImg.ufilter = '^smwc.*';
+wcImg.ufilter = '^wc.*';
 wcImg.num     = [2 3];
 
 % ---------------------------------------------------------------------

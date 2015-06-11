@@ -1,6 +1,7 @@
 function fn_out = crc_USwL(job)
 
-testing = true;
+% testing = true;
+testing = false;
 
 if ~testing
     %% Define defaults processing parameters
@@ -102,7 +103,7 @@ if ~testing
         end
     end
     if ~isempty(fn_warped_Oth)
-        for ii=1:size(fn_warped_MPM,1) % warped Others
+        for ii=1:size(fn_warped_Oth,1) % warped Others
           fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
         end
     end
@@ -121,7 +122,7 @@ if ~testing
     fn_out.segmImg.mwc2 = {deblank(tmp(2,:))}; % modulated warped WM
     fn_out.segmImg.mwc3 = {deblank(tmp(3,:))}; % modulated warped Lesion
     fn_out.segmImg.mwc4 = {deblank(tmp(4,:))}; % modulated warped CSF
-    fn_out.TPMl = fn_TPMl;
+    fn_out.TPMl = {fn_TPMl};
 else
     fn_in{1} = spm_file(job.imgMsk{1},'number','');
     fn_in{2} = spm_file(job.imgRef{1},'number','');
@@ -136,7 +137,7 @@ else
     end
     if ~isempty(fn_in{4})
         fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
-        for ii=1:size(fn_warped_MPM,1)
+        for ii=1:size(fn_warped_Oth,1)
           fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
         end
     end
