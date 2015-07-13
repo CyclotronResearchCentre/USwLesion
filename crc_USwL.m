@@ -11,13 +11,11 @@ if ~testing
         'nDilate', 2, ...  % # of dilation step
         'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
         'tpm_ratio', 100, ... % ratio of lesion/tpm
-        'min_tpm', 1e-6, ... % minimum value of tpm
+        'min_tpm', 1e-6, ... % minimum value of tpm overall
         'min_tpm_icv', 1e-3, ... % minimum value of tpm in intracranial volume
         'b_param', [.00001 Inf], ... % no bias correction needed
         'b_write', [0 0] ... % not writing bias corrected images
         );
-    %     'img2segm', 'MPM+FLAIR', ... % use all images
-    %     'fwhm', 8 ... % smoothing for the preprocessed maps
     
     %% Collect input -> to fit into previously written code. :-)
     fn_in{1} = spm_file(job.imgMsk{1},'number','');
@@ -58,8 +56,6 @@ if ~testing
         'min_tpm', opt.min_tpm);
     
     fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk);
-    % fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'), ...
-    %               spm_file(opt.fn_tpm,'suffix','_l'));
     
     %% 5. Do the segmentation with the new TPM_ms
     % img4US = 0 -> Structural reference only
@@ -171,10 +167,10 @@ function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minNr,nDilate)
 %    matter according to medical criteria (cf. E. Lommers):
 %    "Lesions will ordinarily be larger than 3 mm in cross section"
 %    With 1x1x1mm^3 voxels, a cube of 2x2x2 voxels has a diagonal of
-%    sqrt(12)~3.4mm and counts 8 voxels -> minNr = 8
-% -> fn_tMsk used for the new TPM_ms
-% 2) Then grow the volume by 2 voxels
-% -> fn_dtMsk used for the masking for the 1st warping
+%    sqrt(12)~3.4mm and counts 8 voxels -> minNr = 8 [DEF]
+%   -> fn_tMsk used for the new TPM_ms
+% 2) Then grow the volume by 2 voxels [DEF]
+%   -> fn_dtMsk used for the masking for the 1st warping
 
 if nargin<3
     nDilate = 2;
@@ -192,10 +188,7 @@ XYZvx = V.mat\[XYZ ; ones(1,size(XYZ,2))];
 lMsk  = find(Msk(:)>0);
 lXYZvx = XYZvx(1:3,(lMsk));
 vMsk = Msk(lMsk);
-
 [Ncl,Zcl,Mcl,Acl,XYZcl] = spm_max(vMsk,lXYZvx); %#ok<*NASGU,*ASGLU>
-% figure, hist(unique(Ncl))
-% figure, hist(unique(Ncl(Ncl<100)))
 
 nrA = max(Acl);
 l_all = ones(length(lMsk),1);
@@ -248,6 +241,7 @@ function [matlabbatch] = batch_normalize_smooth(fn_kRef,fn_tMsk,smoKern)
 % - fn_kRef : masked structural image used for the warping estimation
 % - fn_tMsk : cleaned up lesion mask to be warped into MNI
 % - smoKern : smoothing applied on the normalized lesion mask -> new prior
+
 matlabbatch{1}.spm.spatial.normalise.estwrite.subj.vol = {fn_kRef};
 matlabbatch{1}.spm.spatial.normalise.estwrite.subj.resample = {fn_tMsk};
 matlabbatch{1}.spm.spatial.normalise.estwrite.woptions.bb = [-90 -126 -72
@@ -272,41 +266,82 @@ function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 %
 % INPUT
 % - opt : structure with a few parameters
-%     .tpm4lesion : tissues to be modified for lesion
+%     .tpm4lesion : tissues to be modified for lesion (0/1/2/3) for
+%                       GM / WM / GM+WM / GM+WM+CSF
 %     .fn_tpm : tpm file name
 %     .tpm_ratio : ration between WM and lesion
 %     .min_tpm_icv : minimum value in intracranial volume
 %     .min_tpm : minum value overall
 % - fn_swtMsk : filename of smoothed normalized cleaned lesion mask, to be
-%               used as the 7th tissue class
+%               used to create the lesion tissue class
 
-% NOTE:
-% Only supporting WM lesion at the moment!!!
-if opt.tpm4lesion~=0
-    error('LESIONS IN GM NOT SUPPORTED YET!!!');
-end
 % 0) select TPM and load
-fn_TPM = fullfile(spm('dir'),'tpm',opt.fn_tpm);
-Vtpm = spm_vol(fn_TPM);
+fn_TPM   = fullfile(spm('dir'),'tpm',opt.fn_tpm);
+Vtpm     = spm_vol(fn_TPM);
 tpm_orig = spm_read_vols(Vtpm);
-tpm_WM = squeeze(tpm_orig(:,:,:,2));
+tpm_GM   = squeeze(tpm_orig(:,:,:,1));
+tpm_WM   = squeeze(tpm_orig(:,:,:,2)); % used later on to define ICV
+tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
+switch opt.tpm4lesion % Read in the healthy tissue prob map.
+    case 0 % GM only
+        tmp_healthy = tpm_GM;
+    case 1 % WM only
+        tmp_healthy = tpm_WM;
+    case 2 % WM+GM
+        tmp_healthy = tpm_GM+tpm_WM;
+    case 3 % WM+GM+CSF
+        tmp_healthy = tpm_GM+tpm_WM+tpm_CSF;
+    otherwise
+        error('Wrong tissue flag');
+end
 Vl = spm_vol(fn_swtMsk);
 tpm_l = spm_read_vols(Vl);
 
-% 1) scale MS and adjust WM in intracranial volume
-tpm_l = (1-1/opt.tpm_ratio)*tpm_l.*tpm_WM;
-ll = find(tpm_WM>=1e-3 & tpm_l<opt.min_tpm_icv); %#ok<*BDSCI> % find intracranial volume from WM tpm
-tpm_WM = tpm_WM - tpm_l;
-tpm_l(ll) = opt.min_tpm_icv;
-
+% 1) scale lesion tpm and adjust healthy tissue prob map in ICV
 % 2) ensure minium value all over
-tpm_WM(tpm_WM<opt.min_tpm) = opt.min_tpm;
-tpm_l(tpm_l<opt.min_tpm) = opt.min_tpm;
-
 % 3) concatenate by setting lesion at #7 & adjust 'other' class
-tpm_ext = cat(4,tpm_orig,tpm_l);
-tpm_ext(:,:,:,2) = tpm_WM; % update WM
-tpm_ext(:,:,:,6) = 1-sum(tpm_ext(:,:,:,[1:5 7]),4); % update 'other'
+tpm_Lu = (1-1/opt.tpm_ratio)*tpm_l.*tpm_healthy; % update lesion tpm
+tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+tpm_ext = cat(4,tpm_orig,tpm_Lu);
+switch opt.tpm4lesion % update healthy tissues
+    case 0 % GM only
+        tpm_GMu = tmp_healthy - tpm_Lu;
+        % equiv. to tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
+        tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
+        tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_ext(:,:,:,1) = tpm_GMu; % update GM
+    case 1 % WM only
+        tpm_WMu = tmp_healthy - tpm_Lu; 
+        % equiv. to tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
+        tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
+        tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+    case 2 % WM+GM
+        tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
+        tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
+        tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
+        tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
+        tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_ext(:,:,:,1) = tpm_GMu; % update GM
+        tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+    case 3 % WM+GM+CSF
+        tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
+        tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
+        tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
+        tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
+        tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_CSFu = tpm_CSF .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
+        tpm_CSFu(tpm_CSFu<opt.min_tpm) = opt.min_tpm;
+        tpm_CSFu(tpm_WM>=opt.min_tpm_icv & tpm_CSFu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_ext(:,:,:,1) = tpm_GMu; % update GM
+        tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+        tpm_ext(:,:,:,3) = tpm_CSFu; % update CSF
+    otherwise
+        error('Wrong tissue flag');
+end
+tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,[1:5 7]),4); % update 'other'
 
 % 4) save the TPMl, with lesion in #3
 fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'),spm_file(opt.fn_tpm,'suffix','_l'));
@@ -438,11 +473,6 @@ function [matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp)
 % - fn_2warp : cell array of filenames of images to warp
 % - fn_wapr  : file name of warping image
 
-%-----------------------------------------------------------------------
-% Job saved on 10-Mar-2015 18:50:37 by cfg_util (rev $Rev: 6134 $)
-% spm SPM - SPM12 (12.0)
-% cfg_basicio BasicIO - Unknown
-%-----------------------------------------------------------------------
 matlabbatch{1}.spm.spatial.normalise.write.subj.def = {fn_warp};
 matlabbatch{1}.spm.spatial.normalise.write.subj.resample = cellstr(char(fn_img2warp));
 matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70

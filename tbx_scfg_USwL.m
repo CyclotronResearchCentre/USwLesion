@@ -79,14 +79,13 @@ tpm4lesion.tag     = 'tpm4lesion';
 tpm4lesion.name    = 'Tissue probability map(s) affected by the lesion';
 tpm4lesion.help    = {'Choose which tissue class(es) is(are) modified by the lesion'};
 tpm4lesion.labels = {
-    'WM [DEF]'
-    }';
-%     'GM'
-%     'WM+GM'
-%     }'; % Allow other tissue when the code is ready!!!
-% tpm4lesion.values = {0 1 2};
-tpm4lesion.values = {0};
-tpm4lesion.val    = {0};
+    'GM only'
+    'WM only'
+    'WM+GM'
+    'WM+GM+CSF'
+    }'; % Allow other tissue when the code is ready!!!
+tpm4lesion.values = {0 1 2};
+tpm4lesion.val    = {1};
 
 % ---------------------------------------------------------------------
 % options Options
