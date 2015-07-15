@@ -1,7 +1,14 @@
 function fn_out = crc_MPMsmooth(job)
+% Applying tissue spcific smoothing in order to limit partial volume 
+% effect. This is specifically useful for the quantitative MPM images.
+%_______________________________________________________________________
+% Copyright (C) 2015 Cyclotron Research Centre
 
-testing  = true;
-% testing  = false;
+% Written by C. Phillips.
+% Cyclotron Research Centre, University of Liege, Belgium
+
+% testing  = true;
+testing  = false;
 
 if ~testing
     

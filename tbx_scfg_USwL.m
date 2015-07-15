@@ -1,4 +1,12 @@
 function USwL = tbx_scfg_USwL
+% MATLABBATCH sub-configuration file.
+% Doing the Unified Segmentation with updated TPMs, based on a preliminary
+% lesion mask. The latter has to provides by the user!
+%_______________________________________________________________________
+% Copyright (C) 2015 Cyclotron Research Centre
+
+% Written by C. Phillips.
+% Cyclotron Research Centre, University of Liege, Belgium
 
 
 %% Input definitions

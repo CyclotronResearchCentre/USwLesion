@@ -1,4 +1,8 @@
 function ParEx = tbx_scfg_ParEx
+% MATLABBATCH sub-configuration file.
+% Extracting parameters from the segmented images
+%__________________________________________________________________________
+% Copyright (C) 2015 Cyclotron Research Centre
 
 % ---------------------------------------------------------------------
 % imgMPM Structural quantitative images

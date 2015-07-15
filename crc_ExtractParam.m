@@ -1,19 +1,21 @@
 function fn_out = crc_ExtractParam(job)
+% Extracting parameters from the segmented images.
+%
+% Which parameters should extracted?
+% Here are a few things done so far:
+%   1. tICV -> reference volume
+%   2. match between mask and segmented lesion volume
+%   3. %lesion in tICV, %lesion in WM volume
+%   4. MPMvalues in GM, WM and lesion
+%        -> check their histogram
+% REFS:
+% http://www.sciencedirect.com/science/article/pii/S1053811914007769
 %__________________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
 
 % Written by C. Phillips, 2015.
 % Cyclotron Research Centre, University of Liege, Belgium
 
-% REFS:
-% http://www.sciencedirect.com/science/article/pii/S1053811914007769
-
-% Which parameters should extracted?
-% 1. tICV -> reference volume
-% 2. match between mask and segmented lesion volume
-% 3. %lesion in tICV, %lesion in WM volume
-% 4. MPMvalues in GM, WM and lesion
-%    -> check their histogram
 
 fn_cImg = job.cImg;  
 fn_Msk = job.imgMsk; 

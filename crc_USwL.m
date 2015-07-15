@@ -1,4 +1,28 @@
 function fn_out = crc_USwL(job)
+% Doing all the work of "Unified segmentation with lesion".
+% Here are the main steps:
+%   1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
+%       - remov the "small" MS patches using a simple criteria: number of 
+%         voxels in patch must be > minNR    -> t_Msk
+%       - then grow volume by 1 voxel -> dt_Msk
+%   2. Apply the mask on the reference structural images -> k_sRef
+%   3. Segment the masked structural (k_sRef), normalize the cleaned up 
+%      mask (t_Msk) and smooth it -> new TPM for the lesion.
+%   4. Update the TPMs to include a 7th tissue class -> TPMms
+%   Note that the lesion is inserted in *3rd position*, between WM and CSF!
+%   5. Do the segmentation with the new TPM_ms
+%       img4US = 0 -> Structural reference only
+%              = 1 -> all MPMs
+%              = 2 -> all MPMs + others
+%   6. Apply the deformation onto the MPMs -> warped MPMs
+%   7. Collect all the image filenames created
+%
+% Check the Readme file for further processing details.
+%_______________________________________________________________________
+% Copyright (C) 2015 Cyclotron Research Centre
+
+% Written by C. Phillips.
+% Cyclotron Research Centre, University of Liege, Belgium
 
 % testing = true;
 testing = false;
@@ -92,15 +116,15 @@ if ~testing
         spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
         spm_file(fn_in{3}(1,:),'prefix','smwc3') );
     
-    %% 8. Collect all the image filenames created    
+    %% 7. Collect all the image filenames created
     if ~isempty(fn_warped_MPM) % warped MPMs
         for ii=1:size(fn_warped_MPM,1)
-          fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
+            fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
         end
     end
     if ~isempty(fn_warped_Oth)
         for ii=1:size(fn_warped_Oth,1) % warped Others
-          fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
+            fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
         end
     end
     tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
@@ -128,13 +152,13 @@ else
     if ~isempty(fn_in{3})
         fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
         for ii=1:size(fn_warped_MPM,1)
-          fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
+            fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
         end
     end
     if ~isempty(fn_in{4})
         fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
         for ii=1:size(fn_warped_Oth,1)
-          fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
+            fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
         end
     end
     tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
@@ -311,7 +335,7 @@ switch opt.tpm4lesion % update healthy tissues
         tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
         tpm_ext(:,:,:,1) = tpm_GMu; % update GM
     case 1 % WM only
-        tpm_WMu = tmp_healthy - tpm_Lu; 
+        tpm_WMu = tmp_healthy - tpm_Lu;
         % equiv. to tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
         tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV

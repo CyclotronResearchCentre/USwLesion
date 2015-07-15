@@ -1,10 +1,14 @@
 function USwLtools = tbx_cfg_USwithLesion
 % MATLABBATCH Configuration file for toolbox 'USwL', i.e. 'Unified 
-% segmentation with lesion'
+% segmentation with lesion'.
+% 
+% More details (and updates) can be found on:
+% https://github.com/CyclotronResearchCentre/USwLesion
 %_______________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
 
-% Christophe Phillips
+% Written by C. Phillips.
+% Cyclotron Research Centre, University of Liege, Belgium
 
 if ~isdeployed,
     addpath(fullfile(spm('Dir'),'toolbox','USwithLesion'));
