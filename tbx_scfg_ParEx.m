@@ -37,6 +37,17 @@ imgMsk.filter = 'image';
 imgMsk.ufilter = '.*';
 imgMsk.num     = [0 1];
 
+%--------------------------------------------------------------------------
+% outdir Output Directory
+%--------------------------------------------------------------------------
+outdir         = cfg_files;
+outdir.tag     = 'outdir';
+outdir.name    = 'Output Directory';
+outdir.val{1}  = {''};
+outdir.help    = {'File produced will be written into this output directory. If no directory is given, file will be written to directory of MPM images.'};
+outdir.filter  = 'dir';
+outdir.ufilter = '.*';
+outdir.num     = [0 1];
 
 %--------------------------------------------------------------------------
 % thrICV Threshold for ICV definition
@@ -89,7 +100,7 @@ opt.help    = {'azerzaer'};
 ParEx         = cfg_exbranch;
 ParEx.tag     = 'ParEx';
 ParEx.name    = 'Parameter extraction for the GM/WM/lesion';
-ParEx.val     = {imgMPM cImg imgMsk}; % CP: need to add the input
+ParEx.val     = {imgMPM cImg imgMsk outdir opt}; % CP: need to add the input
 ParEx.help    = {['zaer',...
     'sqdfqsd.'],...
     '',...

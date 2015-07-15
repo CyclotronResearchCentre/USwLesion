@@ -1,5 +1,5 @@
 function fn_out = crc_MPMsmooth(job)
-% Applying tissue spcific smoothing in order to limit partial volume 
+% Applying tissue spcific smoothing in order to limit partial volume
 % effect. This is specifically useful for the quantitative MPM images.
 %_______________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
@@ -7,67 +7,31 @@ function fn_out = crc_MPMsmooth(job)
 % Written by C. Phillips.
 % Cyclotron Research Centre, University of Liege, Belgium
 
-% testing  = true;
-testing  = false;
+fn_wMPM = char(job.wMPM);
+fn_mwTC = spm_file(char(job.wcImg),'number','');
 
-if ~testing
-    
-    fn_wMPM = char(job.wMPM);
-    fn_mwTC = spm_file(char(job.wcImg),'number','');
-    
-    % Find list of tissue classes, tc_ind
-    tc_ind = [];
-    for ii = 1:size(fn_mwTC,1)
-        p = strfind(deblank(fn_mwTC(ii,:)),'wc');
-        tc_ind = [tc_ind str2double(deblank(fn_mwTC(ii,p+2)))]; %#ok<*AGROW>
-    end
-    
-    % Collect the TPM_l
-    tpm = spm_file(char(job.tpm_l),'number','');
-    fn_lTPM = char;
-    for ii = tc_ind
-        fn_lTPM = char( fn_lTPM , [tpm,',',num2str(ii)]);
-    end
-    fn_lTPM(1,:) = [];
-    
-    opt_process = struct( ...
-        'fwhm', job.fwhm, ...
-        'tpm', fn_lTPM) ; % , ...
-    
-    % Do it!
-    % fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
-    fn_out.fn = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
-    
-else
-    if ispc
-        tmp1 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_MT_EPIB1.nii'
-            'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_MT_EPIB1.nii'
-            'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_MT_EPIB1.nii'};
-        tmp2 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_R1_EPIB1.nii'
-            'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_R1_EPIB1.nii'
-            'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_R1_EPIB1.nii'};
-        tmp3 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_R2s.nii'
-            'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_R2s.nii'
-            'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_R2s.nii'};
-        tmp4 = {'D:\ccc_DATA\MS_ELommers\Data1\fin_p1_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'
-            'D:\ccc_DATA\MS_ELommers\Data1\fin_p2_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'
-            'D:\ccc_DATA\MS_ELommers\Data1\fin_p3_ws7374-0005-00001-000176-00_A_EPIB1_flat.nii'};
-    else
-        tmp1 = {'/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p1_ws7480-0005-00001-000176-00_MT_EPIB1.nii'
-            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p2_ws7480-0005-00001-000176-00_MT_EPIB1.nii'
-            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p3_ws7480-0005-00001-000176-00_MT_EPIB1.nii'};
-        tmp2 = {'/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p1_ws7480-0005-00001-000176-00_R1_EPIB1.nii'
-            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p2_ws7480-0005-00001-000176-00_R1_EPIB1.nii'
-            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p3_ws7480-0005-00001-000176-00_R1_EPIB1.nii'};
-        tmp3 = {'/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p1_ws7480-0005-00001-000176-00_R2s.nii'
-            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p2_ws7480-0005-00001-000176-00_R2s.nii'
-            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p3_ws7480-0005-00001-000176-00_R2s.nii'};
-        tmp4 = {'/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p1_ws7480-0005-00001-000176-00_A_EPIB1_flat.nii'
-            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p2_ws7480-0005-00001-000176-00_A_EPIB1_flat.nii'
-            '/Users/chrisp/Documents/MATLAB/3_Data/MSdata_ELommers/Data2/fin_p3_ws7480-0005-00001-000176-00_A_EPIB1_flat.nii'};        
-    end
-    fn_out.fn = {tmp1 tmp2 tmp3 tmp4}    ;
+% Find list of tissue classes, tc_ind
+tc_ind = [];
+for ii = 1:size(fn_mwTC,1)
+    p = strfind(deblank(fn_mwTC(ii,:)),'wc');
+    tc_ind = [tc_ind str2double(deblank(fn_mwTC(ii,p+2)))]; %#ok<*AGROW>
 end
+
+% Collect the TPM_l
+tpm = spm_file(char(job.tpm_l),'number','');
+fn_lTPM = char;
+for ii = tc_ind
+    fn_lTPM = char( fn_lTPM , [tpm,',',num2str(ii)]);
+end
+fn_lTPM(1,:) = [];
+
+opt_process = struct( ...
+    'fwhm', job.fwhm, ...
+    'tpm', fn_lTPM) ; % , ...
+
+% Do it!
+% fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
+fn_out.fn = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
 
 end
 

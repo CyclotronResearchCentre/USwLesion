@@ -2,11 +2,11 @@ function fn_out = crc_USwL(job)
 % Doing all the work of "Unified segmentation with lesion".
 % Here are the main steps:
 %   1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
-%       - remov the "small" MS patches using a simple criteria: number of 
+%       - remov the "small" MS patches using a simple criteria: number of
 %         voxels in patch must be > minNR    -> t_Msk
 %       - then grow volume by 1 voxel -> dt_Msk
 %   2. Apply the mask on the reference structural images -> k_sRef
-%   3. Segment the masked structural (k_sRef), normalize the cleaned up 
+%   3. Segment the masked structural (k_sRef), normalize the cleaned up
 %      mask (t_Msk) and smooth it -> new TPM for the lesion.
 %   4. Update the TPMs to include a 7th tissue class -> TPMms
 %   Note that the lesion is inserted in *3rd position*, between WM and CSF!
@@ -24,161 +24,122 @@ function fn_out = crc_USwL(job)
 % Written by C. Phillips.
 % Cyclotron Research Centre, University of Liege, Belgium
 
-% testing = true;
-testing = false;
+%% Define defaults processing parameters
+opt = struct( ...
+    'fn_tpm', 'nwTPM_sl2.nii', ... % filename of tpm to use (could also be 'TPM.nii')
+    'minNr', 8, ...    % #voxels in lesion patch must be > minNr
+    'nDilate', 2, ...  % # of dilation step
+    'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
+    'tpm_ratio', 100, ... % ratio of lesion/tpm
+    'min_tpm', 1e-6, ... % minimum value of tpm overall
+    'min_tpm_icv', 1e-3, ... % minimum value of tpm in intracranial volume
+    'b_param', [.00001 Inf], ... % no bias correction needed
+    'b_write', [0 0] ... % not writing bias corrected images
+    );
 
-if ~testing
-    %% Define defaults processing parameters
-    opt = struct( ...
-        'fn_tpm', 'nwTPM_sl2.nii', ... % filename of tpm to use (could also be 'TPM.nii')
-        'minNr', 8, ...    % #voxels in lesion patch must be > minNr
-        'nDilate', 2, ...  % # of dilation step
-        'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
-        'tpm_ratio', 100, ... % ratio of lesion/tpm
-        'min_tpm', 1e-6, ... % minimum value of tpm overall
-        'min_tpm_icv', 1e-3, ... % minimum value of tpm in intracranial volume
-        'b_param', [.00001 Inf], ... % no bias correction needed
-        'b_write', [0 0] ... % not writing bias corrected images
-        );
-    
-    %% Collect input -> to fit into previously written code. :-)
-    fn_in{1} = spm_file(job.imgMsk{1},'number','');
-    fn_in{2} = spm_file(job.imgRef{1},'number','');
-    fn_in{3} = char(spm_file(job.imgMPM,'number',''));
-    fn_in{4} = char(spm_file(job.imgOth,'number',''));
-    
-    %% 1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
-    % - remov the "small" MS patches using a simple criteria: number of voxels
-    %   in patch must be > minNR    -> t_Msk
-    % - then grow volume by 1 voxel -> dt_Msk
-    [fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minNr,opt.nDilate);
-    
-    %% 2. Apply the mask on the reference structural images -> k_sRef
-    fn_kMTw = spm_file(fn_in{2},'prefix','k');
-    Vi(1) = spm_vol(fn_in{2});
-    Vi(2) = spm_vol(fn_dtMsk);
-    Vo = Vi(1);
-    Vo.fname = fn_kMTw;
-    Vo = spm_imcalc(Vi,Vo,'i1.*(((i2>.5)-1)./((i2>.5)-1))');
-    pth = spm_file(fn_in{1},'path');
-    
-    %% 3. Segment the masked structural (k_sRef), normalize the cleaned up mask
-    % (t_Msk) and smooth it -> new TPM for the lesion.
-    clear matlabbatch
-    [matlabbatch] = batch_normalize_smooth(fn_kMTw,fn_tMsk,opt.smoKern);
-    spm_jobman('run', matlabbatch);
-    fn_swtMsk = spm_file(fn_tMsk,'prefix','sw');
-    fn_wtMsk = spm_file(fn_tMsk,'prefix','w');
-    
-    %% 4. Update the TPMs to include a 7th tissue class -> TPMms
-    % Note that the lesion is inserted in *3rd position*, between WM and CSF!
-    opt_tpm = struct(...
-        'tpm4lesion', job.options.tpm4lesion, ...
-        'fn_tpm', opt.fn_tpm, ...
-        'tpm_ratio', opt.tpm_ratio, ...
-        'min_tpm_icv', opt.min_tpm_icv, ...
-        'min_tpm', opt.min_tpm);
-    
-    fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk);
-    
-    %% 5. Do the segmentation with the new TPM_ms
-    % img4US = 0 -> Structural reference only
-    %        = 1 -> all MPMs
-    %        = 2 -> all MPMs + others
-    
-    switch job.options.img4US
-        case 0
-            fn_Img2segm = fn_in{2}; %#ok<*CCAT1>
-        case 1
-            fn_Img2segm = fn_in{3};
-        case 2
-            fn_Img2segm = char(fn_in{3} , fn_in{4});
-    end
-    opt_segm  =struct( ...
-        'b_param', opt.b_param, ...
-        'b_write', opt.b_write);
-    clear matlabbatch
-    [matlabbatch] = batch_segment_l(fn_Img2segm, fn_TPMl, opt_segm);
-    spm_jobman('run', matlabbatch);
-    
-    %% 6. Apply the deformation onto the MPMs -> warped MPMs
-    
-    fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
-    % Apply on all images: MPM + others
-    fn_img2warp = {char(fn_in{3} , fn_in{4})};
-    clear matlabbatch
-    [matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp);
-    spm_jobman('run', matlabbatch);
-    fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
-    fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
-    fn_mwTC = char( ...
-        spm_file(fn_in{3}(1,:),'prefix','smwc1'), ...
-        spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
-        spm_file(fn_in{3}(1,:),'prefix','smwc3') );
-    
-    %% 7. Collect all the image filenames created
-    if ~isempty(fn_warped_MPM) % warped MPMs
-        for ii=1:size(fn_warped_MPM,1)
-            fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
-        end
-    end
-    if ~isempty(fn_warped_Oth)
-        for ii=1:size(fn_warped_Oth,1) % warped Others
-            fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
-        end
-    end
-    tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
-    fn_out.segmImg.c1 = {deblank(tmp(1,:))}; % GM
-    fn_out.segmImg.c2 = {deblank(tmp(2,:))}; % WM
-    fn_out.segmImg.c3 = {deblank(tmp(3,:))}; % Lesion
-    fn_out.segmImg.c4 = {deblank(tmp(4,:))}; % CSF
-    tmp = spm_select('FPList',pth,'^wc[0-9].*\.nii$'); % segmented tissues
-    fn_out.segmImg.wc1 = {deblank(tmp(1,:))}; % warped GM
-    fn_out.segmImg.wc2 = {deblank(tmp(2,:))}; % warped WM
-    fn_out.segmImg.wc3 = {deblank(tmp(3,:))}; % warped Lesion
-    fn_out.segmImg.wc4 = {deblank(tmp(4,:))}; % warped CSF
-    tmp = spm_select('FPList',pth,'^mwc[0-9].*\.nii$'); % segmented tissues
-    fn_out.segmImg.mwc1 = {deblank(tmp(1,:))}; % modulated warped GM
-    fn_out.segmImg.mwc2 = {deblank(tmp(2,:))}; % modulated warped WM
-    fn_out.segmImg.mwc3 = {deblank(tmp(3,:))}; % modulated warped Lesion
-    fn_out.segmImg.mwc4 = {deblank(tmp(4,:))}; % modulated warped CSF
-    fn_out.TPMl = {fn_TPMl};
-else
-    fn_in{1} = spm_file(job.imgMsk{1},'number','');
-    fn_in{2} = spm_file(job.imgRef{1},'number','');
-    fn_in{3} = char(spm_file(job.imgMPM,'number',''));
-    fn_in{4} = char(spm_file(job.imgOth,'number',''));
-    pth = spm_file(fn_in{1},'path');
-    if ~isempty(fn_in{3})
-        fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
-        for ii=1:size(fn_warped_MPM,1)
-            fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
-        end
-    end
-    if ~isempty(fn_in{4})
-        fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
-        for ii=1:size(fn_warped_Oth,1)
-            fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
-        end
-    end
-    tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
-    fn_out.segmImg.c1 = {deblank(tmp(1,:))}; % GM
-    fn_out.segmImg.c2 = {deblank(tmp(2,:))}; % WM
-    fn_out.segmImg.c3 = {deblank(tmp(3,:))}; % Lesion
-    fn_out.segmImg.c4 = {deblank(tmp(4,:))}; % CSF
-    tmp = spm_select('FPList',pth,'^wc[0-9].*\.nii$'); % segmented tissues
-    fn_out.segmImg.wc1 = {deblank(tmp(1,:))}; % warped GM
-    fn_out.segmImg.wc2 = {deblank(tmp(2,:))}; % warped WM
-    fn_out.segmImg.wc3 = {deblank(tmp(3,:))}; % warped Lesion
-    fn_out.segmImg.wc4 = {deblank(tmp(4,:))}; % warped CSF
-    tmp = spm_select('FPList',pth,'^mwc[0-9].*\.nii$'); % segmented tissues
-    fn_out.segmImg.mwc1 = {deblank(tmp(1,:))}; % modulated warped GM
-    fn_out.segmImg.mwc2 = {deblank(tmp(2,:))}; % modulated warped WM
-    fn_out.segmImg.mwc3 = {deblank(tmp(3,:))}; % modulated warped Lesion
-    fn_out.segmImg.mwc4 = {deblank(tmp(4,:))}; % modulated warped CSF
-    fn_TPMl = spm_select('FPList',pth,'TPM.*\.nii$');
-    fn_out.TPMl = {fn_TPMl};
+%% Collect input -> to fit into previously written code. :-)
+fn_in{1} = spm_file(job.imgMsk{1},'number','');
+fn_in{2} = spm_file(job.imgRef{1},'number','');
+fn_in{3} = char(spm_file(job.imgMPM,'number',''));
+fn_in{4} = char(spm_file(job.imgOth,'number',''));
+
+%% 1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
+% - remov the "small" MS patches using a simple criteria: number of voxels
+%   in patch must be > minNR    -> t_Msk
+% - then grow volume by 1 voxel -> dt_Msk
+[fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minNr,opt.nDilate);
+
+%% 2. Apply the mask on the reference structural images -> k_sRef
+fn_kMTw = spm_file(fn_in{2},'prefix','k');
+Vi(1) = spm_vol(fn_in{2});
+Vi(2) = spm_vol(fn_dtMsk);
+Vo = Vi(1);
+Vo.fname = fn_kMTw;
+Vo = spm_imcalc(Vi,Vo,'i1.*(((i2>.5)-1)./((i2>.5)-1))');
+pth = spm_file(fn_in{1},'path');
+
+%% 3. Segment the masked structural (k_sRef), normalize the cleaned up mask
+% (t_Msk) and smooth it -> new TPM for the lesion.
+clear matlabbatch
+[matlabbatch] = batch_normalize_smooth(fn_kMTw,fn_tMsk,opt.smoKern);
+spm_jobman('run', matlabbatch);
+fn_swtMsk = spm_file(fn_tMsk,'prefix','sw');
+fn_wtMsk = spm_file(fn_tMsk,'prefix','w');
+
+%% 4. Update the TPMs to include a 7th tissue class -> TPMms
+% Note that the lesion is inserted in *3rd position*, between WM and CSF!
+opt_tpm = struct(...
+    'tpm4lesion', job.options.tpm4lesion, ...
+    'fn_tpm', opt.fn_tpm, ...
+    'tpm_ratio', opt.tpm_ratio, ...
+    'min_tpm_icv', opt.min_tpm_icv, ...
+    'min_tpm', opt.min_tpm);
+
+fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk);
+
+%% 5. Do the segmentation with the new TPM_ms
+% img4US = 0 -> Structural reference only
+%        = 1 -> all MPMs
+%        = 2 -> all MPMs + others
+
+switch job.options.img4US
+    case 0
+        fn_Img2segm = fn_in{2}; %#ok<*CCAT1>
+    case 1
+        fn_Img2segm = fn_in{3};
+    case 2
+        fn_Img2segm = char(fn_in{3} , fn_in{4});
 end
+opt_segm  =struct( ...
+    'b_param', opt.b_param, ...
+    'b_write', opt.b_write);
+clear matlabbatch
+[matlabbatch] = batch_segment_l(fn_Img2segm, fn_TPMl, opt_segm);
+spm_jobman('run', matlabbatch);
+
+%% 6. Apply the deformation onto the MPMs -> warped MPMs
+
+fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
+% Apply on all images: MPM + others
+fn_img2warp = {char(fn_in{3} , fn_in{4})};
+clear matlabbatch
+[matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp);
+spm_jobman('run', matlabbatch);
+fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
+fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
+fn_mwTC = char( ...
+    spm_file(fn_in{3}(1,:),'prefix','smwc1'), ...
+    spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
+    spm_file(fn_in{3}(1,:),'prefix','smwc3') );
+
+%% 7. Collect all the image filenames created
+if ~isempty(fn_warped_MPM) % warped MPMs
+    for ii=1:size(fn_warped_MPM,1)
+        fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
+    end
+end
+if ~isempty(fn_warped_Oth)
+    for ii=1:size(fn_warped_Oth,1) % warped Others
+        fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
+    end
+end
+tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
+fn_out.segmImg.c1 = {deblank(tmp(1,:))}; % GM
+fn_out.segmImg.c2 = {deblank(tmp(2,:))}; % WM
+fn_out.segmImg.c3 = {deblank(tmp(3,:))}; % Lesion
+fn_out.segmImg.c4 = {deblank(tmp(4,:))}; % CSF
+tmp = spm_select('FPList',pth,'^wc[0-9].*\.nii$'); % segmented tissues
+fn_out.segmImg.wc1 = {deblank(tmp(1,:))}; % warped GM
+fn_out.segmImg.wc2 = {deblank(tmp(2,:))}; % warped WM
+fn_out.segmImg.wc3 = {deblank(tmp(3,:))}; % warped Lesion
+fn_out.segmImg.wc4 = {deblank(tmp(4,:))}; % warped CSF
+tmp = spm_select('FPList',pth,'^mwc[0-9].*\.nii$'); % segmented tissues
+fn_out.segmImg.mwc1 = {deblank(tmp(1,:))}; % modulated warped GM
+fn_out.segmImg.mwc2 = {deblank(tmp(2,:))}; % modulated warped WM
+fn_out.segmImg.mwc3 = {deblank(tmp(3,:))}; % modulated warped Lesion
+fn_out.segmImg.mwc4 = {deblank(tmp(4,:))}; % modulated warped CSF
+fn_out.TPMl = {fn_TPMl};
+
 end
 
 %% =======================================================================

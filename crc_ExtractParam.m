@@ -10,19 +10,23 @@ function fn_out = crc_ExtractParam(job)
 %        -> check their histogram
 % REFS:
 % http://www.sciencedirect.com/science/article/pii/S1053811914007769
+% Dice coefficient: http://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
+% Jaccard index: http://en.wikipedia.org/wiki/Jaccard_index
 %__________________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
 
 % Written by C. Phillips, 2015.
 % Cyclotron Research Centre, University of Liege, Belgium
 
-
 fn_cImg = job.cImg;  
-fn_Msk = job.imgMsk; 
-fn_MPM = job.imgMPM; 
-
-pth = spm_fileparts(fn_cImg(1,:));
-
+fn_Msk  = job.imgMsk; 
+fn_MPM  = job.imgMPM; 
+pth = spm_fileparts(fn_MPM(1,:));
+if isempty(job.outdir)
+    pth_out = pth;
+else
+    pth_out = job.outdir;
+end
 opt = job.opt;
 
 %% 1. build ICV from the sum of GM, WM, CSF and lesion
@@ -43,7 +47,7 @@ res.Picv = Vicv.fname;
 Vtmsk = spm_vol(fn_Msk);
 Vc3 = spm_vol(fn_cImg(3,:));
 v_tmsk = spm_read_vols(Vtmsk);
-v_tmsk = v_tmsk(:) >.5;
+v_tmsk = v_tmsk(:) >.5; % thresholding at .5, as it shoul dbe a binary img
 v_c3 = spm_read_vols(Vc3);
 v_c3 = v_c3(:) > opt.thr_lesion;
 
@@ -52,9 +56,9 @@ N_c3 = sum(v_c3);
 N_intersec = sum(v_tmsk.*v_c3);
 N_union = sum( (v_tmsk+v_c3)>0 );
 
-% Dice coefficient: http://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
+% Dice coefficient
 DC = 2*N_intersec / (N_tmsk + N_c3) ; 
-% Jaccard index: http://en.wikipedia.org/wiki/Jaccard_index
+% Jaccard index
 JI = N_intersec/N_union ;
 
 res.match = struct( ...
@@ -64,11 +68,6 @@ res.match = struct( ...
     'N_c3', N_c3, ...
     'N_intersec', N_intersec, ...
     'N_union', N_union);
-
-% figure, hist(v_tmsk(v_tmsk>0)),
-% min(v_tmsk), max(v_tmsk)
-% figure, hist(v_c3(v_c3>0)),
-% min(v_c3), max(v_c3)
 
 %% 3. Volumes
 clear matlabbatch
@@ -107,16 +106,21 @@ for ii=1:nMPM
         vMPM{jj}(:,ii) = v_mpm(tmp(:));
     end
 end
-
 res.vMPM = vMPM; %#ok<*STRNU>
 
-
-fn_out.fn_ExParam = fullfile(pth,'ExParam');
+fn_out.fn_ExParam = fullfile(pth_out,'ExParam');
 save(fn_out.fn_ExParam,'res');
+
+
+end
+
+%% VARIOUS BITS OF CODE FOR DISPLAY 
+% figure, hist(v_tmsk(v_tmsk>0)),
+% min(v_tmsk), max(v_tmsk)
+% figure, hist(v_c3(v_c3>0)),
+% min(v_c3), max(v_c3)
 
 % figure,
 % hist(vMPM{1})
-
-end
 
 
