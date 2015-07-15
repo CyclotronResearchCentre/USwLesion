@@ -308,13 +308,13 @@ tpm_WM   = squeeze(tpm_orig(:,:,:,2)); % used later on to define ICV
 tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
 switch opt.tpm4lesion % Read in the healthy tissue prob map.
     case 0 % GM only
-        tmp_healthy = tpm_GM;
+        tpm_healthy = tpm_GM;
     case 1 % WM only
-        tmp_healthy = tpm_WM;
+        tpm_healthy = tpm_WM;
     case 2 % WM+GM
-        tmp_healthy = tpm_GM+tpm_WM;
+        tpm_healthy = tpm_GM+tpm_WM;
     case 3 % WM+GM+CSF
-        tmp_healthy = tpm_GM+tpm_WM+tpm_CSF;
+        tpm_healthy = tpm_GM+tpm_WM+tpm_CSF;
     otherwise
         error('Wrong tissue flag');
 end
@@ -329,13 +329,13 @@ tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at
 tpm_ext = cat(4,tpm_orig,tpm_Lu);
 switch opt.tpm4lesion % update healthy tissues
     case 0 % GM only
-        tpm_GMu = tmp_healthy - tpm_Lu;
+        tpm_GMu = tpm_healthy - tpm_Lu;
         % equiv. to tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
         tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
         tpm_ext(:,:,:,1) = tpm_GMu; % update GM
     case 1 % WM only
-        tpm_WMu = tmp_healthy - tpm_Lu;
+        tpm_WMu = tpm_healthy - tpm_Lu;
         % equiv. to tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
         tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
