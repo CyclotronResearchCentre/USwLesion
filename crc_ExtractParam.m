@@ -18,14 +18,14 @@ function fn_out = crc_ExtractParam(job)
 % Written by C. Phillips, 2015.
 % Cyclotron Research Centre, University of Liege, Belgium
 
-fn_cImg = job.cImg;  
-fn_Msk  = job.imgMsk; 
-fn_MPM  = job.imgMPM; 
-pth = spm_fileparts(fn_MPM(1,:));
+fn_cImg = char(job.cImg);  
+fn_Msk  = char(job.imgMsk); 
+fn_MPM  = char(job.imgMPM); 
+[pth,fn] = spm_fileparts(fn_MPM(1,:));
 if isempty(job.outdir)
     pth_out = pth;
 else
-    pth_out = job.outdir;
+    pth_out = job.outdir{1};
 end
 opt = job.opt;
 
@@ -34,7 +34,7 @@ Vtc = spm_vol(fn_cImg);
 v_tc = spm_read_vols(Vtc(1:4));
 v_icv = sum(v_tc,4);
 % size(v_tc), size(v_icv)
-v_icv = v_icv > opt.thr_icv;
+v_icv = v_icv > opt.thrICV;
 
 Vicv = Vtc(1);
 Vicv.fname = spm_file(Vicv.fname,'prefix','icv_');
@@ -49,7 +49,7 @@ Vc3 = spm_vol(fn_cImg(3,:));
 v_tmsk = spm_read_vols(Vtmsk);
 v_tmsk = v_tmsk(:) >.5; % thresholding at .5, as it shoul dbe a binary img
 v_c3 = spm_read_vols(Vc3);
-v_c3 = v_c3(:) > opt.thr_lesion;
+v_c3 = v_c3(:) > opt.thrLesion;
 
 N_tmsk = sum(v_tmsk);
 N_c3 = sum(v_c3);
@@ -95,7 +95,7 @@ nMPM = size( fn_MPM,1);
 Vmpm = spm_vol(fn_MPM);
 Vtc = spm_vol(fn_cImg);
 v_tc123 = spm_read_vols(Vtc(1:3));
-vt_tc123 = v_tc123 > opt.thr_tc ;
+vt_tc123 = v_tc123 > opt.thrTC ;
 
 vMPM = cell(3,1);
 for ii=1:nMPM
@@ -108,7 +108,7 @@ for ii=1:nMPM
 end
 res.vMPM = vMPM; %#ok<*STRNU>
 
-fn_out.fn_ExParam = fullfile(pth_out,'ExParam');
+fn_out.fn_ExParam = fullfile(pth_out,['ExP_',fn]);
 save(fn_out.fn_ExParam,'res');
 
 
