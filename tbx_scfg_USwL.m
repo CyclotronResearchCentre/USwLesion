@@ -92,7 +92,7 @@ tpm4lesion.labels = {
     'WM+GM'
     'WM+GM+CSF'
     }'; % Allow other tissue when the code is ready!!!
-tpm4lesion.values = {0 1 2};
+tpm4lesion.values = {0 1 2 3};
 tpm4lesion.val    = {1};
 
 % ---------------------------------------------------------------------
