@@ -260,7 +260,8 @@ function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 %               used to create the lesion tissue class
 
 % 0) select TPM and load
-fn_TPM   = opt.fn_tpm;
+[pth,fnam,ext,num] = spm_fileparts(opt.fn_tpm);
+fn_TPM = fullfile(pth,[fnam,ext]); % ensuring I load all 6 TPMs together.
 Vtpm     = spm_vol(fn_TPM);
 tpm_orig = spm_read_vols(Vtpm);
 tpm_GM   = squeeze(tpm_orig(:,:,:,1));
