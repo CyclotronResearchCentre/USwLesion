@@ -96,12 +96,24 @@ tpm4lesion.values = {0 1 2 3};
 tpm4lesion.val    = {1};
 
 % ---------------------------------------------------------------------
+% imgTpm TPM images
+% ---------------------------------------------------------------------
+imgTpm         = cfg_files;
+imgTpm.tag     = 'imgTpm';
+imgTpm.name    = 'Tissue probability maps';
+imgTpm.help    = {'Select the TPM images. ' };
+imgTpm.filter  = 'image';
+imgTpm.ufilter = '.*';
+imgTpm.num     = [1 1];
+imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','unwTPM_sl2.nii')};
+
+% ---------------------------------------------------------------------
 % options Options
 % ---------------------------------------------------------------------
 options         = cfg_branch;
 options.tag     = 'options';
 options.name    = 'Options';
-options.val     = {img4US tpm4lesion};
+options.val     = {img4US tpm4lesion imgTpm};
 options.help    = {'Some processing options.'};
 %_______________________________________________________________________
 

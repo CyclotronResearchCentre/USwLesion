@@ -26,7 +26,6 @@ function fn_out = crc_USwL(job)
 
 %% Define defaults processing parameters
 opt = struct( ...
-    'fn_tpm', 'nwTPM_sl2.nii', ... % filename of tpm to use (could also be 'TPM.nii')
     'minNr', 8, ...    % #voxels in lesion patch must be > minNr
     'nDilate', 2, ...  % # of dilation step
     'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
@@ -56,7 +55,7 @@ Vi(2) = spm_vol(fn_dtMsk);
 Vo = Vi(1);
 Vo.fname = fn_kMTw;
 Vo = spm_imcalc(Vi,Vo,'i1.*(((i2>.5)-1)./((i2>.5)-1))');
-pth = spm_file(fn_in{1},'path');
+pth = spm_file(fn_in{2},'path');
 
 %% 3. Segment the masked structural (k_sRef), normalize the cleaned up mask
 % (t_Msk) and smooth it -> new TPM for the lesion.
@@ -70,7 +69,7 @@ fn_wtMsk = spm_file(fn_tMsk,'prefix','w');
 % Note that the lesion is inserted in *3rd position*, between WM and CSF!
 opt_tpm = struct(...
     'tpm4lesion', job.options.tpm4lesion, ...
-    'fn_tpm', opt.fn_tpm, ...
+    'fn_tpm', job.options.imgTpm, ...
     'tpm_ratio', opt.tpm_ratio, ...
     'min_tpm_icv', opt.min_tpm_icv, ...
     'min_tpm', opt.min_tpm);
@@ -261,7 +260,7 @@ function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 %               used to create the lesion tissue class
 
 % 0) select TPM and load
-fn_TPM   = fullfile(spm('dir'),'tpm',opt.fn_tpm);
+fn_TPM   = opt.fn_tpm;
 Vtpm     = spm_vol(fn_TPM);
 tpm_orig = spm_read_vols(Vtpm);
 tpm_GM   = squeeze(tpm_orig(:,:,:,1));
@@ -328,8 +327,8 @@ switch opt.tpm4lesion % update healthy tissues
 end
 tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,[1:5 7]),4); % update 'other'
 
-% 4) save the TPMl, with lesion in #3
-fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'),spm_file(opt.fn_tpm,'suffix','_l'));
+% 4) save the TPMl, with lesion in #3, in subject's data directory.
+fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'),spm_file(spm_file(opt.fn_tpm,'filename'),'suffix','_l'));
 Vtpm_l = Vtpm;
 Vtpm_l(7) = Vtpm(6);
 mem_sz = Vtpm(2).pinfo(3)-Vtpm(1).pinfo(3);
