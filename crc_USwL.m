@@ -329,7 +329,7 @@ end
 tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,[1:5 7]),4); % update 'other'
 
 % 4) save the TPMl, with lesion in #3, in subject's data directory.
-fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'),spm_file(spm_file(opt.fn_tpm,'filename'),'suffix','_l'));
+fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'),spm_file(spm_file(fn_TPM,'filename'),'suffix','_l'));
 Vtpm_l = Vtpm;
 Vtpm_l(7) = Vtpm(6);
 mem_sz = Vtpm(2).pinfo(3)-Vtpm(1).pinfo(3);
