@@ -22,7 +22,7 @@ fn_cImg = char(job.cImg);
 fn_Msk  = char(job.imgMsk); 
 fn_MPM  = char(job.imgMPM); 
 [pth,fn] = spm_fileparts(fn_MPM(1,:));
-if isempty(job.outdir)
+if isempty(job.outdir{1})
     pth_out = pth;
 else
     pth_out = job.outdir{1};
@@ -47,7 +47,7 @@ res.Picv = Vicv.fname;
 Vtmsk = spm_vol(fn_Msk);
 Vc3 = spm_vol(fn_cImg(3,:));
 v_tmsk = spm_read_vols(Vtmsk);
-v_tmsk = v_tmsk(:) >.5; % thresholding at .5, as it shoul dbe a binary img
+v_tmsk = v_tmsk(:) >.5; % thresholding at .5, as it should be a binary img
 v_c3 = spm_read_vols(Vc3);
 v_c3 = v_c3(:) > opt.thrLesion;
 
