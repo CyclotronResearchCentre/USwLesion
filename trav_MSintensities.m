@@ -44,7 +44,7 @@ for ii=1:4
 end
 
 lab_MPM = {'MT', 'A', 'R1', 'R2'};
-lab_tc = {'GM', 'WM', 'lesion'};
+lab_tc = {'GM', 'WM', 'Lesion'};
 
 % Plot histograms from all 4 MPMs
 N = zeros(Nbins+1,3,4);
@@ -66,6 +66,34 @@ for ii=1:4
     legend(lab_tc)
     xlabel(lab_MPM{ii});
 end
+
+% Plot joint distribution of MPMs for GM/WM/Lesion
+figure,
+f_ind = 0;
+for ii=1:3
+    for jj=(ii+1):4
+        f_ind = f_ind+1;
+        subplot(3,2,f_ind), hold on
+        plot(res.vMPM{1}(:,ii),res.vMPM{1}(:,jj),'.b', ...
+             res.vMPM{2}(:,ii),res.vMPM{2}(:,jj),'.g', ...
+        	 res.vMPM{3}(:,ii),res.vMPM{3}(:,jj),'.r', ...
+             'MarkerSize',.1)
+%         if f_ind==1, legend(lab_tc,'Location','EastOutside'); end
+        xlabel(lab_MPM{ii});
+        ylabel(lab_MPM{jj});
+        axis square
+        axis([mM(ii,:) mM(jj,:)])
+    end
+end
+axes('position',[0.1 0.1 .8 .8])
+plot(rand(2,1),rand(2,1),'b',rand(2,1),rand(2,1),'g',rand(2,1),rand(2,1),'r','Visible','off')
+set(gca,'Visible','off')
+legend(lab_tc,'Location','North')
+
+% Create joint histograms and plot them
+jhist = crc_jhist(res.vMPM{1}(:,1),res.vMPM{1}(:,2),mM([1 2],:));
+figure, imagesc(jhist), axis xy
+
 
 % % Plot in 3D for GM/WM/les
 % jj=1;
