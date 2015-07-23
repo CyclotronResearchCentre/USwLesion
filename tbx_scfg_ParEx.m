@@ -58,7 +58,7 @@ thrICV.name    = 'Threshold for ICV definition';
 thrICV.help    = {'Threshold for ICV definition'};
 thrICV.strtype = 'r';
 thrICV.num     = [1 1];
-thrICV.val     = {.1};
+thrICV.val     = {.5};
 
 %--------------------------------------------------------------------------
 % thrLesion Threshold for Lesion volume
@@ -66,10 +66,10 @@ thrICV.val     = {.1};
 thrLesion         = cfg_entry;
 thrLesion.tag     = 'thrLesion';
 thrLesion.name    = 'Threshold for Lesion volume';
-thrLesion.help    = {'Threshold for Lesion volume'};
+thrLesion.help    = {'Threshold to estimate the lesion volume'};
 thrLesion.strtype = 'r';
 thrLesion.num     = [1 1];
-thrLesion.val     = {2/3};
+thrLesion.val     = {.8};
 
 %--------------------------------------------------------------------------
 % thrTC Threshold for tissue classes
@@ -77,10 +77,10 @@ thrLesion.val     = {2/3};
 thrTC         = cfg_entry;
 thrTC.tag     = 'thrTC';
 thrTC.name    = 'Threshold for tissue classes';
-thrTC.help    = {'Threshold for tissue classes'};
+thrTC.help    = {'Threshold for tissue classes, when extracting the MPM values'};
 thrTC.strtype = 'r';
 thrTC.num     = [1 1];
-thrTC.val     = {2/3};
+thrTC.val     = {.8};
 
 % ---------------------------------------------------------------------
 % opt Options
@@ -89,7 +89,7 @@ opt         = cfg_branch;
 opt.tag     = 'opt';
 opt.name    = 'Options';
 opt.val     = {thrICV thrLesion thrTC};
-opt.help    = {'azerzaer'};
+opt.help    = {'Defining some thresholds for the parameters/values extraction'};
 %_______________________________________________________________________
 
 
@@ -101,10 +101,7 @@ ParEx         = cfg_exbranch;
 ParEx.tag     = 'ParEx';
 ParEx.name    = 'Parameter extraction for the GM/WM/lesion';
 ParEx.val     = {imgMPM cImg imgMsk outdir opt}; % CP: need to add the input
-ParEx.help    = {['zaer',...
-    'sqdfqsd.'],...
-    '',...
-    'mljkmjm'};
+ParEx.help    = {'Extracting some parameters from the MPMs over the GM/WM/lesion tissue classes'};
 ParEx.prog = @crc_ExtractParam;
 ParEx.vout = @vout_ExtractParam;
 
