@@ -1,31 +1,33 @@
-function [jhist] = crc_jhist(J,K,range)
+function [jhist,xy_axes] = crc_jhist(J,K,range)
 % function [jhist] = crc_jhist(J,K,range)
-%takes two images of equal size and pixel value ranges and returns the
-%joint histogram, joint entropy, and mutual information. No error checking
-%used, as this function is built for speed. For additional speed,
-%instructions on how to remove what you do not need are in the comments
-%below
-%made my Jason Agne 10MAY13
+% takes two images of equal size and pixel value ranges and returns the
+% joint histogram, joint entropy, and mutual information. No error checking
+% used, as this function is built for speed. For additional speed,
+% instructions on how to remove what you do not need are in the comments
+% below
+% made my Jason Agne 10MAY13
+% assumes 256x256 (pixel values range from 0-255)
+% this assumption can be changed here if desired
+dimen = 256;
+tmp = 0:dimen-1;
 
 % range can be
 % - a scalar -> images scaled according to their own range
 % - a 2x2 matrix -> images scaled accordign to min-Max provided per line
 
 if nargin>2
-    % Rescale according to either
-    if numel(range)==1   % image range or
+    % Rescale according to either image range or provided range 
+    if numel(range)==1 
         range = [min(J(:)) max(J(:)) ; min(K(:)) max(K(:)) ];
-    else 
-        % provided range 
     end
-    J = round( (J-range(1,1))/diff(range(1,:)) * 255 -.5 + eps);
-    K = round( (K-range(2,1))/diff(range(2,:)) * 255 -.5 + eps);
+    J = round( (J-range(1,1))/diff(range(1,:)) * (dimen-1) -.5 + eps);
+    K = round( (K-range(2,1))/diff(range(2,:)) * (dimen-1) -.5 + eps);
+    xy_axes = [(tmp'/dimen*diff(range(1,:)))+range(1,1) ...
+               (tmp'/dimen*diff(range(2,:)))+range(2,1)];
 else
+    xy_axes = [tmp' tmp'];
 %     assume pixel values range from [0 255]
 end
-%%assumes 256x256 (pixel values range from 0-255)
-%%this assumption can be changed here if desired
-dimen = 256;
 
 x = numel(J);
 t = 1:x;
@@ -58,6 +60,7 @@ end
 % The original code is available on Matlab website:
 %   http://www.mathworks.com/matlabcentral/fileexchange/41714-fast-mutual-information--joint-entropy--and-joint-histogram-calculation-for-n-d-images/content/ent.zip
 % and copy-pasted here:
+% 
 % function [jhist jent MI] = ent(J,K)
 % %takes two images of equal size and pixel value ranges and returns the
 % %joint histogram, joint entropy, and mutual information. No error checking
