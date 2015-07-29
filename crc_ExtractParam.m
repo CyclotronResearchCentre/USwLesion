@@ -96,7 +96,7 @@ res.lesionV = struct(...
     'lesionV_per_wmv', lesionV_per_wmv);
 
 %% 4. extraction of MPM values for the GM/WM/lesion
-nMPM = size( fn_MPM,1);
+nMPM = size(fn_MPM,1);
 Vmpm = spm_vol(fn_MPM);
 Vtc = spm_vol(fn_cImg);
 v_tc123 = spm_read_vols(Vtc(1:3));
@@ -106,13 +106,37 @@ vMPM = cell(3,1);
 for ii=1:nMPM
     v_mpm = spm_read_vols(Vmpm(ii));
     v_mpm = v_mpm(:);
-    for jj=1:3
+    for jj=1:3 % tc
         tmp = vt_tc123(:,:,:,jj);
         vMPM{jj}(:,ii) = v_mpm(tmp(:));
     end
 end
 res.vMPM = vMPM; %#ok<*STRNU>
 
+%% 5. some stats from the MPM values
+% Find min-max, mean, median, std, skewness ,kurtosis for each MPM
+mM = zeros(nMPM,2); mM(:,1) = Inf; mM(:,2) = -Inf;
+meanVal = zeros(3,nMPM); medVal = zeros(3,nMPM); stdVal = zeros(3,nMPM);
+skewVal = zeros(3,nMPM); kurtVal = zeros(3,nMPM);
+for ii=1:3 % tc
+    for jj=1:nMPM % mpm
+        % min/max total
+        tmp_m = min(res.vMPM{ii}(:,jj));
+        if tmp_m<mM(jj,1), mM(jj,1) = tmp_m; end
+        tmp_M = max(res.vMPM{ii}(:,jj));
+        if tmp_M>mM(jj,2), mM(jj,2) = tmp_M; end
+        % mean/meadian/std/skewness/kurtosis
+        meanVal(ii,jj) = mean(res.vMPM{ii}(:,jj));
+        medVal(ii,jj) = median(res.vMPM{ii}(:,jj));
+        stdVal(ii,jj) = std(res.vMPM{ii}(:,jj));
+        skewVal(ii,jj) = skewness(res.vMPM{ii}(:,jj));
+        kurtVal(ii,jj) = kurtosis(res.vMPM{ii}(:,jj))-3;
+    end
+end
+res.vMPMstats = struct('mM',mM,'meanVal',meanVal,'medVal',medVal,...
+                    'stdVal',stdVal,'skewVal',skewVal,'kurtVal',kurtVal);
+
+%% 6. save things and pass out fn_out
 fn_out.fn_ExParam = fullfile(pth_out,['ExP_',fn]);
 save(fn_out.fn_ExParam,'res');
 
