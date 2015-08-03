@@ -26,6 +26,7 @@ function fn_out = crc_USwL(job)
 
 %% Define defaults processing parameters
 opt = struct( ...
+    'thrMPM', false, ...    % threshold MPM images to avoid unsually large/negative values
     'minNr', 8, ...    % #voxels in lesion patch must be > minNr
     'nDilate', 2, ...  % # of dilation step
     'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
@@ -37,15 +38,41 @@ opt = struct( ...
     );
 
 %% Collect input -> to fit into previously written code. :-)
-fn_in{1} = spm_file(job.imgMsk{1},'number','');
-fn_in{2} = spm_file(job.imgRef{1},'number','');
-fn_in{3} = char(spm_file(job.imgMPM,'number',''));
-fn_in{4} = char(spm_file(job.imgOth,'number',''));
+fn_in{1} = spm_file(job.imgMsk{1},'number',''); % Mask image
+fn_in{2} = spm_file(job.imgRef{1},'number',''); % structural reference
+fn_in{3} = char(spm_file(job.imgMPM,'number','')); % All MPM's
+fn_in{4} = char(spm_file(job.imgOth,'number','')); % Other images
+
+%% 0. Clean up of the MPM images!
+% Need to know the order of the images, ideally MT, A, R1, R2 and should
+% check with their filename? based on '_MT', '_A', '_R1', '_R2'?
+if opt.thrMPM
+    strMPM = {'_A', '_MT', '_R1', '_R2'}; nSt = numel(strMPM);
+    thrMPM = [200 5 5 100]; % Thresholds for A, MT, R1 & R2.
+    nMPM = size(fn_in{3},1);
+    fn_tmp = [];
+    for ii=1:nMPM % Loop over MPM files
+        mtch = zeros(nSt,1);
+        for jj=1:nSt
+            tmp = strfind(spm_file(fn_in{3}(ii,:),'filename'),strMPM{jj});
+            if ~isempty(tmp), mtch(jj) = tmp(end); end % pick last index if many
+        end
+        [~,p_mtch] = max(mtch);
+        if p_mtch
+            fn_tmp = char( fn_tmp , ...
+                fix_MPMintens(deblank(fn_in{3}(ii,:)),thrMPM(p_mtch)));
+        else
+            fprintf('\nCould not fix file : %s',fn_in{3}(ii,:))
+            fn_tmp = char( fn_tmp , deblank(fn_in{3}(ii,:)));
+        end
+    end
+    fn_in{3} = fn_tmp(2:end,:);
+end
 
 %% 1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
-% - remov the "small" MS patches using a simple criteria: number of voxels
-%   in patch must be > minNR    -> t_Msk
-% - then grow volume by 1 voxel -> dt_Msk
+% - remov the "small" lesion patches using a simple criteria: number of
+%   voxels in patch must be > minNR    -> t_Msk
+% - then grow volume by 1 voxel     -> dt_Msk
 [fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minNr,opt.nDilate);
 
 %% 2. Apply the mask on the reference structural images -> k_sRef
@@ -144,6 +171,47 @@ end
 %% =======================================================================
 %% SUBFUNCTIONS
 %% =======================================================================
+
+%% STEP 0: Fixing intensities of MPM images
+function fn_out = fix_MPMintens(fn_in,thrMPM)
+% Make sure that MPM intensities are within [0 thrMPM] by capping the
+% values. The resulting image is written out with the prefix 't'.
+% On top, create a binary mask of voxels that were "fixed", with a value 
+% of 1 if the voxel value was <0, or 2 if >thrMPM.
+
+crt_mask = true;
+
+V = spm_vol(fn_in);
+dd = spm_read_vols(V);
+sz_dd = size(dd); dd = dd(:);
+
+if crt_mask
+    ll_fix = (dd<0) + (dd>thrMPM)*2;
+    Vf = V;
+    Vf.dt(1) = 2; % uint8
+    Vf.fname = spm_file(V.fname,'prefix','msk_');
+    Vf.descrip = 'fixed voxels, 1 if <0 and 2 if >thrMPM';
+    Vf = spm_create_vol(Vf);
+    Vf = spm_write_vol(Vf,reshape(ll_fix,sz_dd));
+end
+
+% dd(dd<0) = thrMPM*1e-6; % tiny bit but different from zero, to avoid masking
+% dd(dd>thrMPM) = thrMPM;
+% dd(dd<0) = 0;
+% dd(dd>thrMPM) = 0;
+dd = abs(dd);
+NaboveThr = sum(dd>thrMPM);
+dd(dd>thrMPM) = thrMPM * (1 + randn(NaboveThr,1)*1e-3);
+
+dd = reshape(dd,sz_dd);
+Vc = V;
+Vc.fname = spm_file(V.fname,'prefix','t');
+Vc = spm_create_vol(Vc);
+Vc = spm_write_vol(Vc,dd);
+fn_out = Vc.fname;
+
+
+end
 
 %% STEP 1: Removing small lesion patches from mask
 function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minNr,nDilate)
@@ -396,41 +464,26 @@ if nP>1
     end
 end
 % Define 7 TPM's
-matlabbatch{1}.spm.spatial.preproc.tissue(1).tpm = {[Ptpm_l,',1']}; % GM
-matlabbatch{1}.spm.spatial.preproc.tissue(1).ngaus = 2; % increased from default value 1, could be Inf for nonparametric approach
-matlabbatch{1}.spm.spatial.preproc.tissue(1).native = [1 1];
-matlabbatch{1}.spm.spatial.preproc.tissue(1).warped = [1 1];
-matlabbatch{1}.spm.spatial.preproc.tissue(2).tpm = {[Ptpm_l,',2']}; % WM
-matlabbatch{1}.spm.spatial.preproc.tissue(2).ngaus = 2; % increased from default value 1
-matlabbatch{1}.spm.spatial.preproc.tissue(2).native = [1 1];
-matlabbatch{1}.spm.spatial.preproc.tissue(2).warped = [1 1];
-matlabbatch{1}.spm.spatial.preproc.tissue(3).tpm = {[Ptpm_l,',3']}; % Lesion TPM!
-matlabbatch{1}.spm.spatial.preproc.tissue(3).ngaus = 2;
-matlabbatch{1}.spm.spatial.preproc.tissue(3).native = [1 1];
-matlabbatch{1}.spm.spatial.preproc.tissue(3).warped = [1 1];
-matlabbatch{1}.spm.spatial.preproc.tissue(4).tpm = {[Ptpm_l,',4']}; % CSF
-matlabbatch{1}.spm.spatial.preproc.tissue(4).ngaus = 2;
-matlabbatch{1}.spm.spatial.preproc.tissue(4).native = [1 0];
-matlabbatch{1}.spm.spatial.preproc.tissue(4).warped = [1 1];
-matlabbatch{1}.spm.spatial.preproc.tissue(5).tpm = {[Ptpm_l,',5']}; % bones
-matlabbatch{1}.spm.spatial.preproc.tissue(5).ngaus = 3;
-matlabbatch{1}.spm.spatial.preproc.tissue(5).native = [1 0];
-matlabbatch{1}.spm.spatial.preproc.tissue(5).warped = [0 0];
-matlabbatch{1}.spm.spatial.preproc.tissue(6).tpm = {[Ptpm_l,',6']}; % soft tissues
-matlabbatch{1}.spm.spatial.preproc.tissue(6).ngaus = 4;
-matlabbatch{1}.spm.spatial.preproc.tissue(6).native = [1 0];
-matlabbatch{1}.spm.spatial.preproc.tissue(6).warped = [0 0];
-matlabbatch{1}.spm.spatial.preproc.tissue(7).tpm = {[Ptpm_l,',7']}; % others
-matlabbatch{1}.spm.spatial.preproc.tissue(7).ngaus = 2;
-matlabbatch{1}.spm.spatial.preproc.tissue(7).native = [0 0];
-matlabbatch{1}.spm.spatial.preproc.tissue(7).warped = [0 0];
+nGauss = [2 2 2 2 3 4 4]; % Note: GM & WM 1->2,  Lesion -> 2, other 2->4.
+cr_native = [1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ];
+cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ];
+for ii = 1:7
+    matlabbatch{1}.spm.spatial.preproc.tissue(ii).tpm = {[Ptpm_l,',',num2str(ii)]};
+    matlabbatch{1}.spm.spatial.preproc.tissue(ii).ngaus = nGauss(ii);
+    matlabbatch{1}.spm.spatial.preproc.tissue(ii).native = cr_native(ii,:);
+    matlabbatch{1}.spm.spatial.preproc.tissue(ii).warped = cr_warped(ii,:);
+end
+% Define other parameters
 matlabbatch{1}.spm.spatial.preproc.warp.mrf = 1;
 matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 1;
+% matlabbatch{1}.spm.spatial.preproc.warp.mrf = 0;
+% matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 0;
 matlabbatch{1}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
 matlabbatch{1}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{1}.spm.spatial.preproc.warp.fwhm = 0;
 matlabbatch{1}.spm.spatial.preproc.warp.samp = 3;
 matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1];
+% Smoothing a bit
 matlabbatch{2}.spm.spatial.smooth.data(1) = ...
     cfg_dep('Segment: mwc1 Images', substruct('.','val', '{}',{1}, ...
     '.','val', '{}',{1}, '.','val', '{}',{1}), ...
@@ -468,4 +521,33 @@ matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 4;
 end
 
 
+%% OLD stuff
+% matlabbatch{1}.spm.spatial.preproc.tissue(1).tpm = {[Ptpm_l,',1']}; % GM
+% matlabbatch{1}.spm.spatial.preproc.tissue(1).ngaus = 2; % increased from default value 1, could be Inf for nonparametric approach
+% matlabbatch{1}.spm.spatial.preproc.tissue(1).native = [1 1];
+% matlabbatch{1}.spm.spatial.preproc.tissue(1).warped = [1 1];
+% matlabbatch{1}.spm.spatial.preproc.tissue(2).tpm = {[Ptpm_l,',2']}; % WM
+% matlabbatch{1}.spm.spatial.preproc.tissue(2).ngaus = 2; % increased from default value 1
+% matlabbatch{1}.spm.spatial.preproc.tissue(2).native = [1 1];
+% matlabbatch{1}.spm.spatial.preproc.tissue(2).warped = [1 1];
+% matlabbatch{1}.spm.spatial.preproc.tissue(3).tpm = {[Ptpm_l,',3']}; % Lesion TPM!
+% matlabbatch{1}.spm.spatial.preproc.tissue(3).ngaus = 2;
+% matlabbatch{1}.spm.spatial.preproc.tissue(3).native = [1 1];
+% matlabbatch{1}.spm.spatial.preproc.tissue(3).warped = [1 1];
+% matlabbatch{1}.spm.spatial.preproc.tissue(4).tpm = {[Ptpm_l,',4']}; % CSF
+% matlabbatch{1}.spm.spatial.preproc.tissue(4).ngaus = 2;
+% matlabbatch{1}.spm.spatial.preproc.tissue(4).native = [1 0];
+% matlabbatch{1}.spm.spatial.preproc.tissue(4).warped = [1 1];
+% matlabbatch{1}.spm.spatial.preproc.tissue(5).tpm = {[Ptpm_l,',5']}; % bones
+% matlabbatch{1}.spm.spatial.preproc.tissue(5).ngaus = 3;
+% matlabbatch{1}.spm.spatial.preproc.tissue(5).native = [1 0];
+% matlabbatch{1}.spm.spatial.preproc.tissue(5).warped = [0 0];
+% matlabbatch{1}.spm.spatial.preproc.tissue(6).tpm = {[Ptpm_l,',6']}; % soft tissues
+% matlabbatch{1}.spm.spatial.preproc.tissue(6).ngaus = 4;
+% matlabbatch{1}.spm.spatial.preproc.tissue(6).native = [1 0];
+% matlabbatch{1}.spm.spatial.preproc.tissue(6).warped = [0 0];
+% matlabbatch{1}.spm.spatial.preproc.tissue(7).tpm = {[Ptpm_l,',7']}; % others
+% matlabbatch{1}.spm.spatial.preproc.tissue(7).ngaus = 2;
+% matlabbatch{1}.spm.spatial.preproc.tissue(7).native = [0 0];
+% matlabbatch{1}.spm.spatial.preproc.tissue(7).warped = [0 0];
 
