@@ -305,6 +305,11 @@ end
 %% STEP 3: Creating the normalization batch for the masked structural image
 function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
 % [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
+% This includes:
+% - segmentation of the masked structural
+% - writing out + smoothing the normalized lesion mask
+% - creating the ICV-mask from c1/c2/c3/lesion-mask
+% - deleting temporary files
 %
 % INPUT:
 % - fn_kRef : masked structural image used for the warping estimation
@@ -327,32 +332,26 @@ matlabbatch{3}.spm.spatial.preproc.channel.vols(1) = cfg_dep('Named File Selecto
 matlabbatch{3}.spm.spatial.preproc.channel.biasreg = 0.001;
 matlabbatch{3}.spm.spatial.preproc.channel.biasfwhm = 60;
 matlabbatch{3}.spm.spatial.preproc.channel.write = [0 0];
-% matlabbatch{3}.spm.spatial.preproc.tissue(1).tpm = {[fn_TPM,',',num2str(1)]};
 matlabbatch{3}.spm.spatial.preproc.tissue(1).tpm = {spm_file(fn_TPM,'number',1)};
 matlabbatch{3}.spm.spatial.preproc.tissue(1).ngaus = 1;
 matlabbatch{3}.spm.spatial.preproc.tissue(1).native = [1 0];
 matlabbatch{3}.spm.spatial.preproc.tissue(1).warped = [0 0];
-% matlabbatch{3}.spm.spatial.preproc.tissue(2).tpm = {[fn_TPM,',',num2str(2)]};
 matlabbatch{3}.spm.spatial.preproc.tissue(2).tpm = {spm_file(fn_TPM,'number',2)};
 matlabbatch{3}.spm.spatial.preproc.tissue(2).ngaus = 1;
 matlabbatch{3}.spm.spatial.preproc.tissue(2).native = [1 0];
 matlabbatch{3}.spm.spatial.preproc.tissue(2).warped = [0 0];
-% matlabbatch{3}.spm.spatial.preproc.tissue(3).tpm = {[fn_TPM,',',num2str(3)]};
 matlabbatch{3}.spm.spatial.preproc.tissue(3).tpm = {spm_file(fn_TPM,'number',3)};
 matlabbatch{3}.spm.spatial.preproc.tissue(3).ngaus = 2;
 matlabbatch{3}.spm.spatial.preproc.tissue(3).native = [1 0];
 matlabbatch{3}.spm.spatial.preproc.tissue(3).warped = [0 0];
-% matlabbatch{3}.spm.spatial.preproc.tissue(4).tpm = {[fn_TPM,',',num2str(4)]};
 matlabbatch{3}.spm.spatial.preproc.tissue(4).tpm = {spm_file(fn_TPM,'number',4)};
 matlabbatch{3}.spm.spatial.preproc.tissue(4).ngaus = 3;
 matlabbatch{3}.spm.spatial.preproc.tissue(4).native = [0 0];
 matlabbatch{3}.spm.spatial.preproc.tissue(4).warped = [0 0];
-% matlabbatch{3}.spm.spatial.preproc.tissue(5).tpm = {[fn_TPM,',',num2str(5)]};
 matlabbatch{3}.spm.spatial.preproc.tissue(5).tpm = {spm_file(fn_TPM,'number',5)};
 matlabbatch{3}.spm.spatial.preproc.tissue(5).ngaus = 4;
 matlabbatch{3}.spm.spatial.preproc.tissue(5).native = [0 0];
 matlabbatch{3}.spm.spatial.preproc.tissue(5).warped = [0 0];
-% matlabbatch{3}.spm.spatial.preproc.tissue(6).tpm = {[fn_TPM,',',num2str(6)]};
 matlabbatch{3}.spm.spatial.preproc.tissue(6).tpm = {spm_file(fn_TPM,'number',6)};
 matlabbatch{3}.spm.spatial.preproc.tissue(6).ngaus = 2;
 matlabbatch{3}.spm.spatial.preproc.tissue(6).native = [0 0];
@@ -617,35 +616,3 @@ matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = [1 1 1];
 matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 4;
 
 end
-
-
-%% OLD stuff
-% matlabbatch{1}.spm.spatial.preproc.tissue(1).tpm = {[Ptpm_l,',1']}; % GM
-% matlabbatch{1}.spm.spatial.preproc.tissue(1).ngaus = 2; % increased from default value 1, could be Inf for nonparametric approach
-% matlabbatch{1}.spm.spatial.preproc.tissue(1).native = [1 1];
-% matlabbatch{1}.spm.spatial.preproc.tissue(1).warped = [1 1];
-% matlabbatch{1}.spm.spatial.preproc.tissue(2).tpm = {[Ptpm_l,',2']}; % WM
-% matlabbatch{1}.spm.spatial.preproc.tissue(2).ngaus = 2; % increased from default value 1
-% matlabbatch{1}.spm.spatial.preproc.tissue(2).native = [1 1];
-% matlabbatch{1}.spm.spatial.preproc.tissue(2).warped = [1 1];
-% matlabbatch{1}.spm.spatial.preproc.tissue(3).tpm = {[Ptpm_l,',3']}; % Lesion TPM!
-% matlabbatch{1}.spm.spatial.preproc.tissue(3).ngaus = 2;
-% matlabbatch{1}.spm.spatial.preproc.tissue(3).native = [1 1];
-% matlabbatch{1}.spm.spatial.preproc.tissue(3).warped = [1 1];
-% matlabbatch{1}.spm.spatial.preproc.tissue(4).tpm = {[Ptpm_l,',4']}; % CSF
-% matlabbatch{1}.spm.spatial.preproc.tissue(4).ngaus = 2;
-% matlabbatch{1}.spm.spatial.preproc.tissue(4).native = [1 0];
-% matlabbatch{1}.spm.spatial.preproc.tissue(4).warped = [1 1];
-% matlabbatch{1}.spm.spatial.preproc.tissue(5).tpm = {[Ptpm_l,',5']}; % bones
-% matlabbatch{1}.spm.spatial.preproc.tissue(5).ngaus = 3;
-% matlabbatch{1}.spm.spatial.preproc.tissue(5).native = [1 0];
-% matlabbatch{1}.spm.spatial.preproc.tissue(5).warped = [0 0];
-% matlabbatch{1}.spm.spatial.preproc.tissue(6).tpm = {[Ptpm_l,',6']}; % soft tissues
-% matlabbatch{1}.spm.spatial.preproc.tissue(6).ngaus = 4;
-% matlabbatch{1}.spm.spatial.preproc.tissue(6).native = [1 0];
-% matlabbatch{1}.spm.spatial.preproc.tissue(6).warped = [0 0];
-% matlabbatch{1}.spm.spatial.preproc.tissue(7).tpm = {[Ptpm_l,',7']}; % others
-% matlabbatch{1}.spm.spatial.preproc.tissue(7).ngaus = 2;
-% matlabbatch{1}.spm.spatial.preproc.tissue(7).native = [0 0];
-% matlabbatch{1}.spm.spatial.preproc.tissue(7).warped = [0 0];
-
