@@ -16,6 +16,18 @@ imgMPM.ufilter = '.*';
 imgMPM.num     = [1 Inf];
 
 % ---------------------------------------------------------------------
+% imgMPMmsk Mask of excluded voxels from structural quantitative images
+% ---------------------------------------------------------------------
+imgMPMmsk         = cfg_files;
+imgMPMmsk.tag     = 'imgMPMmsk';
+imgMPMmsk.name    = 'Mask of excluded voxels from MPMs';
+imgMPMmsk.help    = {'Select the "msk_MPM" images.'};
+imgMPMmsk.filter  = 'image';
+imgMPMmsk.ufilter = '.*';
+imgMPMmsk.num     = [0 Inf];
+imgMPMmsk.val       = {''};
+
+% ---------------------------------------------------------------------
 % cImg Tissue class images
 % ---------------------------------------------------------------------
 cImg         = cfg_files;
@@ -100,10 +112,13 @@ opt.help    = {'Defining some thresholds for the parameters/values extraction'};
 ParEx         = cfg_exbranch;
 ParEx.tag     = 'ParEx';
 ParEx.name    = 'Parameter extraction for the GM/WM/lesion';
-ParEx.val     = {imgMPM cImg imgMsk outdir opt}; % CP: need to add the input
+ParEx.val     = {imgMPM imgMPMmsk cImg imgMsk outdir opt}; 
 ParEx.help    = {'Extracting some parameters from the MPMs over the GM/WM/lesion tissue classes'};
-ParEx.prog = @crc_ExtractParam;
-ParEx.vout = @vout_ExtractParam;
+ParEx.prog    = @crc_ExtractParam;
+ParEx.vout    = @vout_ExtractParam;
+ParEx.check   = @imgMPMmsk_check;
+
+end
 
 %% OUTPUT function
 %_______________________________________________________________________
@@ -112,4 +127,26 @@ dep            = cfg_dep;
 dep.sname      = 'Extracted Parameters Mat_file';
 dep.src_output = substruct('.','fn_ExParam');
 dep.tgt_spec   = cfg_findspec({{'filter','mat'}});
+
+end
 %_______________________________________________________________________
+
+%% CHECK function
+%_______________________________________________________________________
+function t = imgMPMmsk_check(job)
+t = {};
+if ~isempty(job.imgMPM) && ~isempty(job.imgMPMmsk)
+    % Check that numbers do match.
+    Nimg = numel(job.imgMPM);
+    Nmsk = numel(job.imgMPMmsk);
+    if Nimg~=Nmsk
+        t = {sprintf('Num MPM images (%d) ~= Num Msk images (%d)', Nimg,Nmsk)};
+    end
+end
+% for i=1:numel(sess.regress)
+%     if numel(sess.scans) ~= numel(sess.regress(i).val)
+%         t = {t{:}, sprintf('Num scans (%d) ~= Num regress[%d] (%d).',numel(sess.scans),i,numel(sess.regress(i).val))};
+%     end
+% end
+
+end
