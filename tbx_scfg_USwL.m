@@ -57,7 +57,7 @@ imgOth         = cfg_files;
 imgOth.tag     = 'imgOth';
 imgOth.name    = 'Other structural images';
 imgOth.help    = {'Select the other structural (e.g. FLAIR) images .'
-        'These will be segmented and warped into MNI space.'};
+    'These will be segmented and warped into MNI space.'};
 imgOth.filter = 'image';
 imgOth.ufilter = '.*';
 imgOth.num     = [0 Inf];
@@ -91,7 +91,7 @@ tpm4lesion.labels = {
     'WM only'
     'WM+GM'
     'WM+GM+CSF'
-    }'; % Allow other tissue when the code is ready!!!
+    }';
 tpm4lesion.values = {0 1 2 3};
 tpm4lesion.val    = {1};
 
@@ -108,12 +108,43 @@ imgTpm.num     = [1 1];
 imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','unwTPM_sl2.nii')};
 
 % ---------------------------------------------------------------------
+% thrMPM Create ICV-mask and mask the MPMs
+% ---------------------------------------------------------------------
+thrMPM         = cfg_menu;
+thrMPM.tag     = 'thrMPM';
+thrMPM.name    = 'Thresholding the MPMs';
+thrMPM.help    = {''};
+thrMPM.labels = {
+    'No'
+    'Yes'
+    }';
+thrMPM.values = {0 1};
+thrMPM.val    = {1};
+
+% ---------------------------------------------------------------------
+% ICVmsk Create ICV-mask and mask the MPMs
+% ---------------------------------------------------------------------
+ICVmsk         = cfg_menu;
+ICVmsk.tag     = 'ICVmsk';
+ICVmsk.name    = 'Create ICV-mask and mask the MPMs';
+ICVmsk.help    = {'An ICV mask can be created from the reference strucrtural '
+    'image and applied onto the MPMs. This cleans up the images quite a bit and'
+    'is equivalent to "skull stripping". This helps, in some cases, the '
+    'multi-channel segmentation of the MPMs.'};
+ICVmsk.labels = {
+    'No'
+    'Yes'
+    }';
+ICVmsk.values = {0 1};
+ICVmsk.val    = {1};
+
+% ---------------------------------------------------------------------
 % options Options
 % ---------------------------------------------------------------------
 options         = cfg_branch;
 options.tag     = 'options';
 options.name    = 'Options';
-options.val     = {img4US tpm4lesion imgTpm};
+options.val     = {imgTpm img4US tpm4lesion thrMPM ICVmsk};
 options.help    = {'Some processing options.'};
 %_______________________________________________________________________
 
@@ -123,7 +154,7 @@ options.help    = {'Some processing options.'};
 % ---------------------------------------------------------------------
 USwL         = cfg_exbranch;
 USwL.tag     = 'uswl';
-USwL.name    = 'Unified segmentation with lesion mask';
+USwL.name    = 'US with lesion';
 USwL.val     = {imgMsk imgRef imgMPM imgOth options};
 USwL.help    = {['Unified segmentation for images with lesions when an ',...
     'approximate mask is also provided. This mask is turned into a ',...
@@ -141,20 +172,56 @@ end
 %_______________________________________________________________________
 function dep = vout_USwL(job) %#ok<*INUSD>
 
+% TPM_lesion
 cdep = cfg_dep;
 cdep.sname      = 'Subject''s TPM with Lesion';
 cdep.src_output = substruct('.','TPMl');
 % cdep.tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
 cdep.tgt_spec   = cfg_findspec({{'filter','nifti'}});
 
+% ICV mask
+cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+cdep(end).sname      = 'Subject''s ICV mask, native space';
+cdep(end).src_output = substruct('.','ICVmsk');
+cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+
+% Thresholded MPM + Mask
+if job.options.thrMPM
+    for ii=1:numel(job.imgMPM)
+        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+        cdep(end).sname      = sprintf('Thresholded MPM image #%d',ii);
+        cdep(end).src_output = substruct('.',sprintf('thrMPM%d',ii));
+        cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+    end
+    for ii=1:numel(job.imgMPM)
+        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+%         cdep(end).sname      = sprintf('Mask thresholded MPM #%d',ii);
+        cdep(end).sname      = sprintf('Threshold-mask MPM #%d',ii);
+        cdep(end).src_output = substruct('.',sprintf('thrMPMmsk%d',ii));
+        cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+    end
+end
+
+% ICV-masked MPM
+if job.options.ICVmsk
+    for ii=1:numel(job.imgMPM)
+        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+        cdep(end).sname      = sprintf('ICV-masked MPM #%d',ii);
+        cdep(end).src_output = substruct('.',sprintf('kMPM%d',ii));
+        cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+    end
+end
+
+% Warped MPM
 if ~isempty(job.imgMPM)
     for ii=1:numel(job.imgMPM)
-        cdep(end+1)          = cfg_dep;
+        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
         cdep(end).sname      = sprintf('Warped MPM image #%d',ii);
         cdep(end).src_output = substruct('.',['wMPM',num2str(ii)]);
         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
     end
 end
+% Warped Other
 if ~isempty(job.imgOth)
     for ii=1:numel(job.imgOth)
         cdep(end+1)          = cfg_dep;

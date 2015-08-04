@@ -24,10 +24,16 @@ function fn_out = crc_USwL(job)
 % Written by C. Phillips.
 % Cyclotron Research Centre, University of Liege, Belgium
 
+
+%% Collect input -> to fit into previously written code. :-)
+fn_in{1} = spm_file(job.imgMsk{1},'number',''); % Mask image
+fn_in{2} = spm_file(job.imgRef{1},'number',''); % structural reference
+fn_in{3} = char(spm_file(job.imgMPM,'number','')); % All MPM's
+fn_in{4} = char(spm_file(job.imgOth,'number','')); % Other images
+nMPM = size(fn_in{3},1);
+
 %% Define defaults processing parameters
 opt = struct( ...
-    'thrMPM', true, ...    % threshold MPM images to avoid unsually large/negative values
-    'ICVmskMPM', true, ... % mask the MPMs to keep the ICV = skull strip
     'minNr', 8, ...    % #voxels in lesion patch must be > minNr
     'nDilate', 2, ...  % # of dilation step
     'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
@@ -37,20 +43,16 @@ opt = struct( ...
     'b_param', [.00001 Inf], ... % no bias correction needed
     'b_write', [0 0] ... % not writing bias corrected images
     );
+%     'thrMPM', true, ...    % threshold MPM images to avoid unsually large/negative values
+%     'ICVmskMPM', true, ... % mask the MPMs to keep the ICV = skull strip
 
-%% Collect input -> to fit into previously written code. :-)
-fn_in{1} = spm_file(job.imgMsk{1},'number',''); % Mask image
-fn_in{2} = spm_file(job.imgRef{1},'number',''); % structural reference
-fn_in{3} = char(spm_file(job.imgMPM,'number','')); % All MPM's
-fn_in{4} = char(spm_file(job.imgOth,'number','')); % Other images
 
 %% 0. Clean up of the MPM images!
 % Need to know the order of the images, ideally MT, A, R1, R2 and should
 % check with their filename? based on '_MT', '_A', '_R1', '_R2'?
-if opt.thrMPM
+if job.options.thrMPM
     strMPM = {'_A', '_MT', '_R1', '_R2'}; nSt = numel(strMPM);
     thrMPM = [200 5 5 100]; % Thresholds for A, MT, R1 & R2.
-    nMPM = size(fn_in{3},1);
     fn_tmp = [];
     for ii=1:nMPM % Loop over MPM files
         mtch = zeros(nSt,1);
@@ -92,12 +94,12 @@ clear matlabbatch
 [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kMTw,fn_tMsk,job.options.imgTpm{1},opt.smoKern);
 spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
-fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); % normalized lesion mask
+fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
 
-if opt.ICVmskMPM % ICV-mask the MPMs
-    Nmpm = size(fn_in{3},1);
+if job.options.ICVmsk % ICV-mask the MPMs
+    fn_in_3_orig = fn_in{3};
     fn_tmp = [];
-    for ii=1:Nmpm
+    for ii=1:nMPM
         fn_MPM_ii = deblank(fn_in{3}(ii,:));
         Vi(1) = spm_vol(fn_MPM_ii);
         Vi(2) = spm_vol(fn_ICV);
@@ -153,17 +155,32 @@ fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
 fn_mwTC = char( ...
     spm_file(fn_in{3}(1,:),'prefix','smwc1'), ...
     spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
-    spm_file(fn_in{3}(1,:),'prefix','smwc3') );
+    spm_file(fn_in{3}(1,:),'prefix','smwc3') ); %#ok<*NASGU>
+
 
 %% 7. Collect all the image filenames created
+if job.options.thrMPM
+    for ii=1:nMPM
+        fn_out.(sprintf('thrMPM%d',ii)) = ...
+            {spm_file(deblank(fn_in_3_orig(ii,:)),'prefix','t')};
+        fn_out.(sprintf('thrMPMmsk%d',ii)) = ...
+            {spm_file(fn_in_3_orig(ii,:),'prefix','msk_')};
+    end
+end
+fn_out.ICVmsk = {fn_ICV};
+if job.options.ICVmsk
+    for ii=1:nMPM
+        fn_out.(sprintf('kMPM%d',ii)) = {deblank(fn_in{3}(ii,:))};
+    end
+end
 if ~isempty(fn_warped_MPM) % warped MPMs
     for ii=1:size(fn_warped_MPM,1)
-        fn_out.(['wMPM',num2str(ii)]) = {deblank(fn_warped_MPM(ii,:))};
+        fn_out.(sprintf('wMPM%d',ii)) = {deblank(fn_warped_MPM(ii,:))};
     end
 end
 if ~isempty(fn_warped_Oth)
     for ii=1:size(fn_warped_Oth,1) % warped Others
-        fn_out.(['wOth',num2str(ii)]) = {deblank(fn_warped_Oth(ii,:))};
+        fn_out.(sprintf('wOth%d',ii)) = {deblank(fn_warped_Oth(ii,:))};
     end
 end
 tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
@@ -182,7 +199,6 @@ fn_out.segmImg.mwc2 = {deblank(tmp(2,:))}; % modulated warped WM
 fn_out.segmImg.mwc3 = {deblank(tmp(3,:))}; % modulated warped Lesion
 fn_out.segmImg.mwc4 = {deblank(tmp(4,:))}; % modulated warped CSF
 fn_out.TPMl = {fn_TPMl};
-
 end
 
 %% =======================================================================
@@ -193,7 +209,7 @@ end
 function fn_out = fix_MPMintens(fn_in,thrMPM)
 % Make sure that MPM intensities are within [0 thrMPM] by capping the
 % values. The resulting image is written out with the prefix 't'.
-% On top, create a binary mask of voxels that were "fixed", with a value 
+% On top, create a binary mask of voxels that were "fixed", with a value
 % of 1 if the voxel value was <0, or 2 if >thrMPM.
 
 crt_mask = true;
@@ -212,10 +228,6 @@ if crt_mask
     Vf = spm_write_vol(Vf,reshape(ll_fix,sz_dd));
 end
 
-% dd(dd<0) = thrMPM*1e-6; % tiny bit but different from zero, to avoid masking
-% dd(dd>thrMPM) = thrMPM;
-% dd(dd<0) = 0;
-% dd(dd>thrMPM) = 0;
 dd = abs(dd);
 NaboveThr = sum(dd>thrMPM);
 dd(dd>thrMPM) = thrMPM * (1 + randn(NaboveThr,1)*1e-3);
@@ -399,11 +411,13 @@ matlabbatch{8}.spm.util.imcalc.options.dmtx = 0;
 matlabbatch{8}.spm.util.imcalc.options.mask = 0;
 matlabbatch{8}.spm.util.imcalc.options.interp = 1;
 matlabbatch{8}.spm.util.imcalc.options.dtype = 2;
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(1) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(2) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(3) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(4) = cfg_dep('Image Calculator: ImCalc Computed Image: tmp.nii', substruct('.','val', '{}',{6}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(5) = cfg_dep('Smooth: Smoothed Images', substruct('.','val', '{}',{7}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
+matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(1) = cfg_dep('Segment: Seg Params', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','param', '()',{':'}));
+matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(2) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
+matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(3) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
+matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(4) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
+matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(5) = cfg_dep('Segment: Forward Deformations', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','fordef', '()',{':'}));
+matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(6) = cfg_dep('Image Calculator: ImCalc Computed Image: tmp.nii', substruct('.','val', '{}',{6}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
+matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(7) = cfg_dep('Smooth: Smoothed Images', substruct('.','val', '{}',{7}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
 matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.action.delete = false;
 
 end
@@ -494,7 +508,8 @@ end
 tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,[1:5 7]),4); % update 'other'
 
 % 4) save the TPMl, with lesion in #3, in subject's data directory.
-fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'),spm_file(spm_file(fn_TPM,'filename'),'suffix','_l'));
+fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'), ...
+    spm_file(spm_file(fn_TPM,'filename'),'suffix','_les'));
 Vtpm_l = Vtpm;
 Vtpm_l(7) = Vtpm(6);
 mem_sz = Vtpm(2).pinfo(3)-Vtpm(1).pinfo(3);
