@@ -50,6 +50,7 @@ opt = struct( ...
 %% 0. Clean up of the MPM images!
 % Need to know the order of the images, ideally MT, A, R1, R2 and should
 % check with their filename? based on '_MT', '_A', '_R1', '_R2'?
+fn_in_3_orig = fn_in{3};
 if job.options.thrMPM
     strMPM = {'_A', '_MT', '_R1', '_R2'}; nSt = numel(strMPM);
     thrMPM = [200 5 5 100]; % Thresholds for A, MT, R1 & R2.
@@ -97,7 +98,6 @@ fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
 
 if job.options.ICVmsk % ICV-mask the MPMs
-    fn_in_3_orig = fn_in{3};
     fn_tmp = [];
     for ii=1:nMPM
         fn_MPM_ii = deblank(fn_in{3}(ii,:));

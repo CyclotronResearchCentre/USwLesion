@@ -6,8 +6,16 @@ function fn_out = crc_ExtractParam(job)
 %   1. tICV -> reference volume
 %   2. match between mask and segmented lesion volume
 %   3. %lesion in tICV, %lesion in WM volume
-%   4. MPMvalues in GM, WM and lesion
-%        -> check their histogram
+%   4. MPMvalues in GM, WM and lesion (-> check their histogram?)
+%      NOTE: if values were thresholded (to exclude outliers), then 2 sets
+%      of values are created, based on the tissue probability only, or
+%      excluding those voxels 'fixed' in any of the MPM
+%   5. some stats (min/max/mean/median/std/skewness/kurtosis) of the values
+%      extracted at 4., for each MPM and tissue class.
+%      NOTE: if values were thresholded (to exclude outliers), then all 
+%            these 'fixed' values are not accoutned for in the stats
+% 
+% 
 % REFS:
 % http://www.sciencedirect.com/science/article/pii/S1053811914007769
 % Dice coefficient: http://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
@@ -70,7 +78,6 @@ fn_seg8 = spm_select('FPList',pth,'^.*_seg8\.mat$');
 matlabbatch{1}.spm.util.tvol.matfiles = {fn_seg8};
 matlabbatch{1}.spm.util.tvol.tmax = 4;
 matlabbatch{1}.spm.util.tvol.mask = {fullfile(spm('dir'),'tpm','mask_ICV.nii,1')};
-% matlabbatch{1}.spm.util.tvol.outf = 'test_volume';
 matlabbatch{1}.spm.util.tvol.outf = fullfile(pth_out,['TV_',fn]);
 spm_jobman('run', matlabbatch);
 tmp = load(fn_seg8);
@@ -108,41 +115,52 @@ Vtc = spm_vol(fn_cImg);
 v_tc123 = spm_read_vols(Vtc(1:3));
 vt_tc123 = v_tc123 > opt.thrTC ;
 
-vMPM = cell(3,nMPM); % #tissue classes x #MPM
+vMPM = cell(3,1); % #tissue classes x #MPM
+if nMsk
+    vMPMmsk = cell(3,1);
+    v_msk = spm_read_vols(Vmsk);
+    v_msk = ~sum(v_msk,4);
+end
 for ii=1:nMPM
     v_mpm = spm_read_vols(Vmpm(ii));
     v_mpm = v_mpm(:);
-    if nMsk
-        v_msk = ~spm_read_vols(Vmsk(ii));
-    end
     for jj=1:3 % tc
         tmp = vt_tc123(:,:,:,jj);
+        vMPM{jj}(:,ii) = v_mpm(tmp(:));
         if nMsk
             tmp = tmp & v_msk;
+            vMPMmsk{jj}(:,ii) = v_mpm(tmp(:));
         end
-        vMPM{jj,ii} = v_mpm(tmp(:));
     end
 end
 res.vMPM = vMPM; %#ok<*STRNU>
+if nMsk
+    res.vMPMmsk = vMPMmsk; %#ok<*STRNU>
+end
 
 %% 5. some stats from the MPM values
 % Find min-max, mean, median, std, skewness ,kurtosis for each MPM
 mM = zeros(nMPM,2); mM(:,1) = Inf; mM(:,2) = -Inf;
 meanVal = zeros(3,nMPM); medVal = zeros(3,nMPM); stdVal = zeros(3,nMPM);
 skewVal = zeros(3,nMPM); kurtVal = zeros(3,nMPM);
+if nMsk
+    v_use = res.vMPMmsk;
+else
+    v_use = res.vMPM;
+end
 for ii=1:3 % tc
     for jj=1:nMPM % mpm
         % min/max total
-        tmp_m = min(res.vMPM{ii,jj});
+        tmp_m = min(v_use{ii}(:,jj));
         if tmp_m<mM(jj,1), mM(jj,1) = tmp_m; end
-        tmp_M = max(res.vMPM{ii,jj});
+        tmp_M = max(v_use{ii}(:,jj));
         if tmp_M>mM(jj,2), mM(jj,2) = tmp_M; end
         % mean/meadian/std/skewness/kurtosis
-        meanVal(ii,jj) = mean(res.vMPM{ii,jj});
-        medVal(ii,jj) = median(res.vMPM{ii,jj});
-        stdVal(ii,jj) = std(res.vMPM{ii,jj});
-        skewVal(ii,jj) = skewness(res.vMPM{ii,jj});
-        kurtVal(ii,jj) = kurtosis(res.vMPM{ii,jj})-3;
+        meanVal(ii,jj) = mean(v_use{ii}(:,jj));
+        medVal(ii,jj) = median(v_use{ii}(:,jj));
+        stdVal(ii,jj) = std(v_use{ii}(:,jj));
+        skewVal(ii,jj) = skewness(v_use{ii}(:,jj));
+        kurtVal(ii,jj) = kurtosis(v_use{ii}(:,jj))-3;
     end
 end
 res.vMPMstats = struct('mM',mM,'meanVal',meanVal,'medVal',medVal,...
@@ -162,7 +180,7 @@ function matlabbatch = create_mask(fn_in,fn_out,pth,thr,smK)
 % It works in 3 steps:
 % 1. sum up the input images
 % 2. smooth the sum
-% 3. threshold  the result
+% 3. threshold the result
 
 if nargin<5, smK = 8; end
 if nargin<4, thr = .5; end
@@ -196,15 +214,5 @@ matlabbatch{4}.cfg_basicio.file_dir.file_ops.file_move.action.delete = false;
 
 end
 
-
-
-%% VARIOUS BITS OF CODE FOR DISPLAY
-% figure, hist(v_tmsk(v_tmsk>0)),
-% min(v_tmsk), max(v_tmsk)
-% figure, hist(v_c3(v_c3>0)),
-% min(v_c3), max(v_c3)
-
-% figure,
-% hist(vMPM{1})
 
 
