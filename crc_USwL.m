@@ -53,7 +53,7 @@ opt = struct( ...
 fn_in_3_orig = fn_in{3};
 if job.options.thrMPM
     strMPM = {'_A', '_MT', '_R1', '_R2'}; nSt = numel(strMPM);
-    thrMPM = [200 5 5 100]; % Thresholds for A, MT, R1 & R2.
+    thrMPM = [200 5 2000 100]; % Thresholds for A, MT, R1 & R2.
     fn_tmp = [];
     for ii=1:nMPM % Loop over MPM files
         mtch = zeros(nSt,1);
