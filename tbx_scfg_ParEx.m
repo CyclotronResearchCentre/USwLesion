@@ -113,7 +113,9 @@ ParEx         = cfg_exbranch;
 ParEx.tag     = 'ParEx';
 ParEx.name    = 'Parameter extraction for the GM/WM/lesion';
 ParEx.val     = {imgMPM imgMPMmsk cImg imgMsk outdir opt}; 
-ParEx.help    = {'Extracting some parameters from the MPMs over the GM/WM/lesion tissue classes'};
+ParEx.help    = {['Extracting some parameters from the MPMs over the ',...
+    'GM/WM/lesion tissue classes.'],...
+    'See the processing function itself for the details of what''s computed.'};
 ParEx.prog    = @crc_ExtractParam;
 ParEx.vout    = @vout_ExtractParam;
 ParEx.check   = @imgMPMmsk_check;

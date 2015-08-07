@@ -108,12 +108,18 @@ imgTpm.num     = [1 1];
 imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','unwTPM_sl2.nii')};
 
 % ---------------------------------------------------------------------
-% thrMPM Create ICV-mask and mask the MPMs
+% thrMPM Threshold outlier values from the MPM
 % ---------------------------------------------------------------------
 thrMPM         = cfg_menu;
 thrMPM.tag     = 'thrMPM';
 thrMPM.name    = 'Thresholding the MPMs';
-thrMPM.help    = {''};
+thrMPM.help    = {['Apply a threshold on the MPM''s to remove outlier ',...
+    'values from the images.'],...
+    ['Take the absolute value of voxels < 0. Voxels > thr are set to thr ',...
+    '+ small random number. The ''thr'' value is defined for each ',...
+    'MPM (A/MT/R1/R2) seperately.'],...
+    'The modified MPM images are prefixed with ''t''.',...
+    'A mask image is created to keep track of those "fixed" voxels".'};
 thrMPM.labels = {
     'No'
     'Yes'
@@ -127,7 +133,7 @@ thrMPM.val    = {1};
 ICVmsk         = cfg_menu;
 ICVmsk.tag     = 'ICVmsk';
 ICVmsk.name    = 'Create ICV-mask and mask the MPMs';
-ICVmsk.help    = {'An ICV mask can be created from the reference strucrtural '
+ICVmsk.help    = {'An ICV mask can be created from the reference structural '
     'image and applied onto the MPMs. This cleans up the images quite a bit and'
     'is equivalent to "skull stripping". This helps, in some cases, the '
     'multi-channel segmentation of the MPMs.'};
