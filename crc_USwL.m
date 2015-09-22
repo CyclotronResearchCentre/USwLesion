@@ -30,7 +30,11 @@ fn_in{1} = spm_file(job.imgMsk{1},'number',''); % Mask image
 fn_in{2} = spm_file(job.imgRef{1},'number',''); % structural reference
 fn_in{3} = char(spm_file(job.imgMPM,'number','')); % All MPM's
 fn_in{4} = char(spm_file(job.imgOth,'number','')); % Other images
-nMPM = size(fn_in{3},1);
+if isempty(fn_in{3})
+    nMPN = 0;
+else
+    nMPM = size(fn_in{3},1);
+end
 
 %% Define defaults processing parameters
 opt = struct( ...
@@ -51,7 +55,7 @@ opt = struct( ...
 % Need to know the order of the images, ideally MT, A, R1, R2 and should
 % check with their filename? based on '_MT', '_A', '_R1', '_R2'?
 fn_in_3_orig = fn_in{3};
-if job.options.thrMPM
+if job.options.thrMPM && nMPN ~= 0
     strMPM = {'_A', '_MT', '_R1', '_R2'}; nSt = numel(strMPM);
     thrMPM = [200 5 2000 100]; % Thresholds for A, MT, R1 & R2.
     fn_tmp = [];
