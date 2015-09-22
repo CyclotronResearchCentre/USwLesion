@@ -23,7 +23,8 @@ function fn_out = crc_USwL(job)
 
 % Written by C. Phillips.
 % Cyclotron Research Centre, University of Liege, Belgium
-
+% Cyril Pernet updated few bits to work with no MPM images + added structural
+% normalization - Edinburgh Imaging, The University of Edinburgh
 
 %% Collect input -> to fit into previously written code. :-)
 fn_in{1} = spm_file(job.imgMsk{1},'number',''); % Mask image
@@ -79,8 +80,8 @@ end
 
 %% 1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
 % - remov the "small" lesion patches using a simple criteria: number of
-%   voxels in patch must be > minNR    -> t_Msk
-% - then grow volume by 1 voxel     -> dt_Msk
+%   voxels in patch must be > minNR -> creates on the drive t_Msk
+% - then grow volume by 1 voxel     -> creates on the drive dt_Msk
 [fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minNr,opt.nDilate);
 
 %% 2. Apply the mask on the reference structural images -> k_sRef
@@ -101,7 +102,7 @@ spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
 
-if job.options.ICVmsk % ICV-mask the MPMs
+if job.options.ICVmsk && nMPN ~= 0 % ICV-mask the MPMs
     fn_tmp = [];
     for ii=1:nMPM
         fn_MPM_ii = deblank(fn_in{3}(ii,:));
@@ -124,7 +125,7 @@ opt_tpm = struct(...
     'min_tpm_icv', opt.min_tpm_icv, ...
     'min_tpm', opt.min_tpm);
 
-fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk);
+fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk); % that creates the new tissue class tmp
 
 %% 5. Do the segmentation with the new TPM_ms
 % img4US = 0 -> Structural reference only
@@ -137,7 +138,12 @@ switch job.options.img4US
     case 1
         fn_Img2segm = fn_in{3};
     case 2
-        fn_Img2segm = char(fn_in{3} , fn_in{4});
+        % fn_Img2segm = char(fn_in{3} , fn_in{4}); % that would make more sense the segment struc and use MPM and others - Cyril
+        if isempty(fn_in{3})
+            fn_Img2segm = char(fn_in{2}, fn_in{4}); % no MPM but others - Cyril
+        else
+            fn_Img2segm = char(fn_in{2}, fn_in{3} , fn_in{4}); 
+        end
 end
 opt_segm  =struct( ...
     'b_param', opt.b_param, ...
@@ -149,11 +155,17 @@ spm_jobman('run', matlabbatch);
 %% 6. Apply the deformation onto the MPMs -> warped MPMs
 
 fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
-% Apply on all images: MPM + others
-fn_img2warp = {char(fn_in{3} , fn_in{4})};
+% Apply on all images: strucural + MPM + others
+if isempty(fn_in{3})
+    fn_img2warp = {char(fn_in{2} , fn_in{4})};
+else
+    fn_img2warp = {char(fn_in{2} ,fn_in{3} , fn_in{4})};
+end
 clear matlabbatch
 [matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp);
 spm_jobman('run', matlabbatch);
+
+fn_warped_struct = spm_file(fn_in{2},'prefix','w');
 fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
 fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
 fn_mwTC = char( ...
@@ -163,7 +175,13 @@ fn_mwTC = char( ...
 
 
 %% 7. Collect all the image filenames created
-if job.options.thrMPM
+if ~isempty(fn_warped_struct)
+    for ii=1:size(fn_warped_struct,1) % warped structural
+        fn_out.(sprintf('wstruct%d',ii)) = {deblank(fn_warped_struct(ii,:))};
+    end
+end
+
+if job.options.thrMPM && nMPN ~= 0
     for ii=1:nMPM
         fn_out.(sprintf('thrMPM%d',ii)) = ...
             {spm_file(deblank(fn_in_3_orig(ii,:)),'prefix','t')};
@@ -171,6 +189,7 @@ if job.options.thrMPM
             {spm_file(fn_in_3_orig(ii,:),'prefix','msk_')};
     end
 end
+
 fn_out.ICVmsk = {fn_ICV};
 if job.options.ICVmsk
     for ii=1:nMPM
@@ -182,11 +201,13 @@ if ~isempty(fn_warped_MPM) % warped MPMs
         fn_out.(sprintf('wMPM%d',ii)) = {deblank(fn_warped_MPM(ii,:))};
     end
 end
+
 if ~isempty(fn_warped_Oth)
     for ii=1:size(fn_warped_Oth,1) % warped Others
         fn_out.(sprintf('wOth%d',ii)) = {deblank(fn_warped_Oth(ii,:))};
     end
 end
+
 tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
 fn_out.segmImg.c1 = {deblank(tmp(1,:))}; % GM
 fn_out.segmImg.c2 = {deblank(tmp(2,:))}; % WM

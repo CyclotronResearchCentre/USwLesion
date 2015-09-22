@@ -7,6 +7,8 @@ function USwL = tbx_scfg_USwL
 
 % Written by C. Phillips.
 % Cyclotron Research Centre, University of Liege, Belgium
+% Cyril Pernet fixed typos and updated help
+% Edinburgh Imaging, The University of Edinburgh
 
 
 %% Input definitions
@@ -18,8 +20,9 @@ function USwL = tbx_scfg_USwL
 imgMsk         = cfg_files;
 imgMsk.tag     = 'imgMsk';
 imgMsk.name    = 'Mask image';
-imgMsk.help    = {'Select the "lesiosn mask" image. '
-    'This should be a binary 1/0 image!' };
+imgMsk.help    = {'Select the "lesion mask" image. This should be a binary 1/0 image'
+    'the thresholded mask t_Mask based on a min size of 8 voxel and the'
+    ' slighlty dilated mask dt_Msk will be saved on the drive'};
 imgMsk.filter = 'image';
 imgMsk.ufilter = '.*';
 imgMsk.num     = [1 1];
@@ -30,9 +33,9 @@ imgMsk.num     = [1 1];
 imgRef         = cfg_files;
 imgRef.tag     = 'imgRef';
 imgRef.name    = 'Structural reference image';
-imgRef.help    = {'Select the structural reference image. '
-    'This image is used 1st to map the lesion mask into MNI and generate '
-    'the subjec specific TPM.'};
+imgRef.help    = {'This image is used 1st to map the lesion mask into MNI and generate '
+    'the subjec specific TPM. The masked image k_img and the brain mask icv_k_ing are'
+    'saved on the drive'};
 imgRef.filter = 'image';
 imgRef.ufilter = '.*';
 imgRef.num     = [1 1];
@@ -101,11 +104,13 @@ tpm4lesion.val    = {1};
 imgTpm         = cfg_files;
 imgTpm.tag     = 'imgTpm';
 imgTpm.name    = 'Tissue probability maps';
-imgTpm.help    = {'Select the TPM images. ' };
+imgTpm.help    = {'Select the TPM images. '
+    ' A TPM_les file will be created with lesions as'
+    ' a new tissue class in position 3'};
 imgTpm.filter  = 'image';
 imgTpm.ufilter = '.*';
 imgTpm.num     = [1 1];
-imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','unwTPM_sl2.nii')};
+imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','TPM.nii')}; % 'unwTPM_sl2.nii'
 
 % ---------------------------------------------------------------------
 % thrMPM Threshold outlier values from the MPM
