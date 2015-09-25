@@ -32,7 +32,7 @@ fn_in{2} = spm_file(job.imgRef{1},'number',''); % structural reference
 fn_in{3} = char(spm_file(job.imgMPM,'number','')); % All MPM's
 fn_in{4} = char(spm_file(job.imgOth,'number','')); % Other images
 if isempty(fn_in{3})
-    nMPN = 0;
+    nMPM = 0;
 else
     nMPM = size(fn_in{3},1);
 end
@@ -56,7 +56,7 @@ opt = struct( ...
 % Need to know the order of the images, ideally MT, A, R1, R2 and should
 % check with their filename? based on '_MT', '_A', '_R1', '_R2'?
 fn_in_3_orig = fn_in{3};
-if job.options.thrMPM && nMPN ~= 0
+if job.options.thrMPM && nMPM ~= 0
     strMPM = {'_A', '_MT', '_R1', '_R2'}; nSt = numel(strMPM);
     thrMPM = [200 5 2000 100]; % Thresholds for A, MT, R1 & R2.
     fn_tmp = [];
@@ -102,7 +102,7 @@ spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
 
-if job.options.ICVmsk && nMPN ~= 0 % ICV-mask the MPMs
+if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs
     fn_tmp = [];
     for ii=1:nMPM
         fn_MPM_ii = deblank(fn_in{3}(ii,:));
@@ -136,11 +136,23 @@ switch job.options.img4US
     case 0
         fn_Img2segm = fn_in{2}; %#ok<*CCAT1>
     case 1
-        fn_Img2segm = fn_in{3};
+        if isempty(fn_in{3})
+            if isempty(fn_in{4})
+                fn_Img2segm = char(fn_in{2});
+            else
+                fn_Img2segm = char(fn_in{2}, fn_in{4});
+            end
+        else
+            fn_Img2segm = fn_in{3};
+        end
     case 2
         % fn_Img2segm = char(fn_in{3} , fn_in{4}); % that would make more sense the segment struc and use MPM and others - Cyril
         if isempty(fn_in{3})
-            fn_Img2segm = char(fn_in{2}, fn_in{4}); % no MPM but others - Cyril
+            if isempty(fn_in{4})
+                fn_Img2segm = char(fn_in{2}); 
+            else
+                fn_Img2segm = char(fn_in{2}, fn_in{4}); % no MPM but others - Cyril
+            end
         else
             fn_Img2segm = char(fn_in{2}, fn_in{3} , fn_in{4}); 
         end
@@ -181,7 +193,7 @@ if ~isempty(fn_warped_struct)
     end
 end
 
-if job.options.thrMPM && nMPN ~= 0
+if job.options.thrMPM && nMPM ~= 0
     for ii=1:nMPM
         fn_out.(sprintf('thrMPM%d',ii)) = ...
             {spm_file(deblank(fn_in_3_orig(ii,:)),'prefix','t')};
@@ -190,12 +202,13 @@ if job.options.thrMPM && nMPN ~= 0
     end
 end
 
-fn_out.ICVmsk = {fn_ICV};
-if job.options.ICVmsk
+fn_out.ICVmsk = {fn_ICV}
+if job.options.ICVmsk && nMPM ~= 0;
     for ii=1:nMPM
         fn_out.(sprintf('kMPM%d',ii)) = {deblank(fn_in{3}(ii,:))};
     end
 end
+
 if ~isempty(fn_warped_MPM) % warped MPMs
     for ii=1:size(fn_warped_MPM,1)
         fn_out.(sprintf('wMPM%d',ii)) = {deblank(fn_warped_MPM(ii,:))};
