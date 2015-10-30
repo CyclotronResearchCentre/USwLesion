@@ -246,7 +246,7 @@ fn_out.segmImg.mwc3 = {deblank(tmp(3,:))}; % modulated warped Lesion
 fn_out.segmImg.mwc4 = {deblank(tmp(4,:))}; % modulated warped CSF
 fn_out.TPMl = {fn_TPMl};
 
-if job.options.thrLesion ~= 0
+if job.option.thrLesion ~= 0
     crc_lesion_cleanup(fn_out.segmImg.c3,job.options.thrLesion);
 end
 
@@ -418,8 +418,8 @@ matlabbatch{3}.spm.spatial.preproc.tissue(6).tpm = {spm_file(fn_TPM,'number',6)}
 matlabbatch{3}.spm.spatial.preproc.tissue(6).ngaus = 2;
 matlabbatch{3}.spm.spatial.preproc.tissue(6).native = [0 0];
 matlabbatch{3}.spm.spatial.preproc.tissue(6).warped = [0 0];
-matlabbatch{3}.spm.spatial.preproc.warp.mrf = 2; %% MRF is for noisy images, allows spatial reg basd on continuity - default 1 --> updated to 2
-matlabbatch{3}.spm.spatial.preproc.warp.cleanup = 1; %% the cleanup is ad-hoc by default leave 1 - we can use spatial extent for further cleaning
+matlabbatch{3}.spm.spatial.preproc.warp.mrf = 1;
+matlabbatch{3}.spm.spatial.preproc.warp.cleanup = 1;
 matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
 matlabbatch{3}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{3}.spm.spatial.preproc.warp.fwhm = 0;

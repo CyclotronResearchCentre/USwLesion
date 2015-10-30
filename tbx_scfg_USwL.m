@@ -112,6 +112,52 @@ imgTpm.ufilter = '.*';
 imgTpm.num     = [1 1];
 imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','TPM.nii')}; % 'unwTPM_sl2.nii'
 
+%--------------------------------------------------------------------------
+% biasreg Bias regularisation
+%--------------------------------------------------------------------------
+biasreg         = cfg_menu;
+biasreg.tag     = 'biasreg';
+biasreg.name    = 'Bias regularisation';
+biasreg.help    = {
+                   'MR images are usually corrupted by a smooth, spatially varying artifact that modulates the intensity of the image (bias). These artifacts, although not usually a problem for visual inspection, can impede automated processing of the images.'
+                   ''
+                   'An important issue relates to the distinction between intensity variations that arise because of bias artifact due to the physics of MR scanning, and those that arise due to different tissue properties.  The objective is to model the latter by different tissue classes, while modelling the former with a bias field. We know a priori that intensity variations due to MR physics tend to be spatially smooth, whereas those due to different tissue types tend to contain more high frequency information. A more accurate estimate of a bias field can be obtained by including prior knowledge about the distribution of the fields likely to be encountered by the correction algorithm. For example, if it is known that there is little or no intensity non-uniformity, then it would be wise to penalise large values for the intensity non-uniformity parameters. This regularisation can be placed within a Bayesian context, whereby the penalty incurred is the negative logarithm of a prior probability for any particular pattern of non-uniformity.'
+                   'Knowing what works best should be a matter of empirical exploration.  For example, if your data has very little intensity non-uniformity artifact, then the bias regularisation should be increased.  This effectively tells the algorithm that there is very little bias in your data, so it does not try to model it.'
+                   }';
+biasreg.labels = {
+                  'no regularisation (0)'
+                  'extremely light regularisation (0.00001)'
+                  'very light regularisation (0.0001)'
+                  'light regularisation (0.001)'
+                  'medium regularisation (0.01)'
+                  'heavy regularisation (0.1)'
+                  'very heavy regularisation (1)'
+                  'extremely heavy regularisation (10)'
+                  }';
+biasreg.values = {
+                  0
+                  1e-05
+                  0.0001
+                  0.001
+                  0.01
+                  0.1
+                  1
+                  10
+                  }';
+biasreg.val    = {1e-05}; % the default is almost nothing, assuming we use MPMs
+
+
+% ---------------------------------------------------------------------
+% Number of Gaussians used to model the lesion
+% ---------------------------------------------------------------------
+NbGaussian         = cfg_entry;
+NbGaussian.tag     = 'NbGaussian';
+NbGaussian.name    = 'Number of Gaussians';
+NbGaussian.help    = {'Set the number of Gaussians to model the lesion'};
+NbGaussian.strtype = 'n';
+NbGaussian.num     = [1 1];
+NbGaussian.val     = {2}; 
+
 % ---------------------------------------------------------------------
 % thrMPM Threshold outlier values from the MPM
 % ---------------------------------------------------------------------
@@ -131,6 +177,17 @@ thrMPM.labels = {
     }';
 thrMPM.values = {0 1};
 thrMPM.val    = {1};
+
+% ---------------------------------------------------------------------
+% thrLesion Threshold lesion mask based on spatial extent
+% ---------------------------------------------------------------------
+thrLesion         = cfg_entry;
+thrLesion.tag     = 'thrLesion';
+thrLesion.name    = 'Thresholding the lesion mask';
+thrLesion.help    = {'Apply a spatial threshold on the lesion tissue class c3. ',...
+    '0 means no threshold, otherwise indicate k value or ''Inf'''};
+thrLesion.num    = [1 1];
+thrLesion.val    = {0};
 
 % ---------------------------------------------------------------------
 % ICVmsk Create ICV-mask and mask the MPMs
@@ -155,7 +212,7 @@ ICVmsk.val    = {1};
 options         = cfg_branch;
 options.tag     = 'options';
 options.name    = 'Options';
-options.val     = {imgTpm img4US tpm4lesion thrMPM ICVmsk};
+options.val     = {imgTpm img4US biasreg NbGaussian tpm4lesion thrMPM thrLesion ICVmsk};  
 options.help    = {'Some processing options.'};
 %_______________________________________________________________________
 
