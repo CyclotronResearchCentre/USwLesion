@@ -418,8 +418,8 @@ matlabbatch{3}.spm.spatial.preproc.tissue(6).tpm = {spm_file(fn_TPM,'number',6)}
 matlabbatch{3}.spm.spatial.preproc.tissue(6).ngaus = 2;
 matlabbatch{3}.spm.spatial.preproc.tissue(6).native = [0 0];
 matlabbatch{3}.spm.spatial.preproc.tissue(6).warped = [0 0];
-matlabbatch{3}.spm.spatial.preproc.warp.mrf = 2; %% MRF is for noisy images, allows spatial reg basd on continuity - default 1 --> updated to 2
-matlabbatch{3}.spm.spatial.preproc.warp.cleanup = 1; %% the cleanup is ad-hoc by default leave 1 - we can use spatial extent for further cleaning
+matlabbatch{3}.spm.spatial.preproc.warp.mrf = 1; 
+matlabbatch{3}.spm.spatial.preproc.warp.cleanup = 1; %% the cleanup is ad-hoc by default leave 1 
 matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
 matlabbatch{3}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{3}.spm.spatial.preproc.warp.fwhm = 0;
@@ -635,8 +635,8 @@ for ii = 1:7
     matlabbatch{1}.spm.spatial.preproc.tissue(ii).warped = cr_warped(ii,:);
 end
 % Define other parameters
-matlabbatch{1}.spm.spatial.preproc.warp.mrf = 2;
-matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 0;
+matlabbatch{1}.spm.spatial.preproc.warp.mrf = 2; %% MRF is for noisy images, allows spatial reg basd on continuity - default 1 --> updated to 2
+matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 1; %% the cleanup is ad-hoc by default leave 1 - we can use spatial extent for further cleaning 
 % matlabbatch{1}.spm.spatial.preproc.warp.mrf = 0;
 % matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 0;
 matlabbatch{1}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
