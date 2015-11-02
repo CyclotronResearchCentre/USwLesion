@@ -141,25 +141,25 @@ switch job.options.img4US
     case 0
         fn_Img2segm = fn_in{2}; %#ok<*CCAT1>
     case 1
-        if isempty(fn_in{3})
-            if isempty(fn_in{4})
-                fn_Img2segm = char(fn_in{2});
+        if isempty(fn_in{3}) % if no MPM
+            if isempty(fn_in{4}) % and no others
+                fn_Img2segm = char(fn_in{2}); % use struct
             else
-                fn_Img2segm = char(fn_in{2}, fn_in{4});
+                fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
             end
         else
-            fn_Img2segm = fn_in{3};
+            fn_Img2segm = fn_in{3}; % else as requested use MPM only
         end
     case 2
-        % fn_Img2segm = char(fn_in{3} , fn_in{4}); % that would make more sense the segment struc and use MPM and others - Cyril
-        if isempty(fn_in{3})
-            if isempty(fn_in{4})
-                fn_Img2segm = char(fn_in{2}); 
+        % fn_Img2segm = char(fn_in{3} , fn_in{4}); 
+        if isempty(fn_in{3}) % if no MPM 
+            if isempty(fn_in{4}) % and no others 
+                fn_Img2segm = char(fn_in{2}); % use struct
             else
-                fn_Img2segm = char(fn_in{2}, fn_in{4}); % no MPM but others - Cyril
+                fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
             end
         else
-            fn_Img2segm = char(fn_in{2}, fn_in{3} , fn_in{4}); 
+            fn_Img2segm = char(fn_in{3} ,fn_in{2},  fn_in{4}); % % else as requested use MPM, and all others
         end
 end
 

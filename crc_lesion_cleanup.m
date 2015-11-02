@@ -18,10 +18,11 @@ function crc_lesion_cleanup(P,k)
 % Copyright (C) 2015 Cyclotron Research Centre
 
 if nargin == 1
-    k='Inf'; % if not specified we keep only the biggest cluster
+    k=Inf; % if not specified we keep only the biggest cluster
 end
 
 % get clusters
+if iscell(P); P=cell2mat(P); end    
 V = spm_vol(P);
 data = spm_read_vols(V);
 [clustered_map,num] = spm_bwlabel(double(data>0),6); % note we use surface connection only
@@ -35,8 +36,8 @@ idxall(1:nv(1))=[]; nv(1)=[];
 ends=cumsum(nv);inis=ends-nv+1;
 
 % make the new map - if cluster >=k then = 1
-if ischar(k);
-    [k,pos] = max(nv);
+if isinf(k) || ischar(k);
+    [~,pos] = max(nv);
     idx=idxall(inis(pos):ends(pos));
     extent_map(idx)=1;
     
