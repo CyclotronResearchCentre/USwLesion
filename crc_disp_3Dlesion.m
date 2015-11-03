@@ -1,9 +1,6 @@
-% function [p_handles, dat_out] = crc_disp_3Dlesion(Ps,Pl,param,other_in)
 function [param_out] = crc_disp_3Dlesion(varargin)
 % FUNCTION param_out = crc_disp_3Dlesion(Ps,Pl,param)
-% or
-% FUNCTION crc_disp_3Dlesion(param)
-%
+% 
 % Plot a 3D visualisation of lesion/blob over a cut structural image.
 % It is also possible to update an exising plot by passign a set of 
 % parameters. This is particularly useful to create frames for a movie.
@@ -36,6 +33,12 @@ function [param_out] = crc_disp_3Dlesion(varargin)
 %       .pa : pointer/handle to axis object
 %
 % or
+%
+% FUNCTION crc_disp_3Dlesion(param)
+%
+% Up date an existing plot. The update can consist in different cut view 
+% (i.e. axis, slice and/or direction) and/or point of view.
+%
 % INPUT for plot update
 % - param = the output parameter from anew plot, with updated
 %       + cutting parameters (axis, slice and direction)
