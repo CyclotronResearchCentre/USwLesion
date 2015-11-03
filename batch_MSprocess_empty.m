@@ -1,5 +1,5 @@
 %-----------------------------------------------------------------------
-% Job saved on 04-Aug-2015 18:14:45 by cfg_util (rev $Rev: 6460 $)
+% Job saved on 03-Nov-2015 17:53:56 by cfg_util (rev $Rev: 6460 $)
 % spm SPM - SPM12 (12.1)
 % cfg_basicio BasicIO - Unknown
 %-----------------------------------------------------------------------
@@ -21,10 +21,18 @@ matlabbatch{4}.spm.tools.USwLtools.uswl.imgMPM(2) = cfg_dep('Named File Selector
 matlabbatch{4}.spm.tools.USwLtools.uswl.imgMPM(3) = cfg_dep('Named File Selector: MPM(3) - Files', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{3}));
 matlabbatch{4}.spm.tools.USwLtools.uswl.imgMPM(4) = cfg_dep('Named File Selector: MPM(4) - Files', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{4}));
 matlabbatch{4}.spm.tools.USwLtools.uswl.imgOth(1) = cfg_dep('Named File Selector: Flair(1) - Files', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{1}));
-matlabbatch{4}.spm.tools.USwLtools.uswl.options.imgTpm = {fullfile(spm('dir'),'tpm','unwTPM_sl2.nii')};
+tmp = fullfile(spm('dir'),'tpm','unwTPM_sl2.nii');
+if exist(tmp,'file')
+    matlabbatch{4}.spm.tools.USwLtools.uswl.options.imgTpm = {tmp}; % Allow for the CRC (and MPM) specific tpm's.
+else
+    matlabbatch{4}.spm.tools.USwLtools.uswl.options.imgTpm = {fullfile(spm('dir'),'tpm','TPM.nii')}; % or use standard SPM tpm's
+end
 matlabbatch{4}.spm.tools.USwLtools.uswl.options.img4US = 1;
+matlabbatch{4}.spm.tools.USwLtools.uswl.options.biasreg = 1e-05;
+matlabbatch{4}.spm.tools.USwLtools.uswl.options.NbGaussian = 2;
 matlabbatch{4}.spm.tools.USwLtools.uswl.options.tpm4lesion = 1;
 matlabbatch{4}.spm.tools.USwLtools.uswl.options.thrMPM = 1;
+matlabbatch{4}.spm.tools.USwLtools.uswl.options.thrLesion = 0;
 matlabbatch{4}.spm.tools.USwLtools.uswl.options.ICVmsk = 1;
 matlabbatch{5}.spm.tools.USwLtools.MPMsmooth.wMPM(1) = cfg_dep('US with lesion: Warped MPM image #1', substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','wMPM1'));
 matlabbatch{5}.spm.tools.USwLtools.MPMsmooth.wMPM(2) = cfg_dep('US with lesion: Warped MPM image #2', substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','wMPM2'));

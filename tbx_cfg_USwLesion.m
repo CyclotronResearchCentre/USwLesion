@@ -21,10 +21,10 @@ USwLtools         = cfg_choice;
 USwLtools.tag     = 'USwLtools';
 USwLtools.name    = 'US with Lesion Tools';
 USwLtools.help    = {
-    ['zae',...
-    'qsdf']
-    ['Tiouop ',...
-    'ghhgk']
+    ['Tools for the segmentation of MR images with lesions ',...
+    'based on the ''unified segementation'' approach.']
+    ['One need to provide an (approximate) mask of the lesioned area(s)',...
+    'in order to use this tool!']
     }';
 USwLtools.values  = {tbx_scfg_USwL tbx_scfg_MPMsmooth tbx_scfg_ParEx};
 
