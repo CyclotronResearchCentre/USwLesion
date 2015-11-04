@@ -17,7 +17,10 @@ function crc_lesion_cleanup(P,k)
 %_______________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
 
-if nargin == 1
+if nargin == 0
+    P = spm_select(1,'image','select image to threshold');
+    k=Inf; % if not specified we keep only the biggest cluster
+elseif nargin == 1
     k=Inf; % if not specified we keep only the biggest cluster
 end
 
@@ -58,5 +61,5 @@ V.fname = [root filesep 'cleaned_' name ext];
 V.descrip = [V.descrip ' thresholded @ k=' num2str(k)];
 V.private.descrip = V.descrip;
 spm_write_vol(V,extent_map);
-
+fprintf('%s created \n',V.fname)
 
