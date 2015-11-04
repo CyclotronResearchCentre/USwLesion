@@ -110,7 +110,12 @@ imgTpm.help    = {'Select the TPM images. '
 imgTpm.filter  = 'image';
 imgTpm.ufilter = '.*';
 imgTpm.num     = [1 1];
-imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','TPM.nii')}; % 'unwTPM_sl2.nii'
+tmp = fullfile(spm('dir'),'tpm','unwTPM_sl2.nii');
+if exist(tmp,'file')
+    imgTpm.val{1}  = {tmp}; % Allow the CRC (and MPM) specific tpm's.
+else
+    imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','TPM.nii')}; % or use standard SPM tpm's
+end
 
 %--------------------------------------------------------------------------
 % biasreg Bias regularisation
