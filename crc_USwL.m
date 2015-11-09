@@ -45,12 +45,12 @@ opt = struct( ...
     'tpm_ratio', 100, ... % ratio of lesion/tpm
     'min_tpm', 1e-6, ... % minimum value of tpm overall
     'min_tpm_icv', 1e-3, ... % minimum value of tpm in intracranial volume
-    'b_param', [job.options.biasreg Inf], ... % bias correction
     'b_write', [0 0] ... % not writing bias corrected images
     );
 
 %     'thrMPM', true, ...    % threshold MPM images to avoid unsually large/negative values
 %     'ICVmskMPM', true, ... % mask the MPMs to keep the ICV = skull strip
+%     'b_param', [job.options.biasreg Inf], ... % bias correction
 
 
 %% 0. Clean up of the MPM images!
@@ -163,10 +163,12 @@ switch job.options.img4US
         end
 end
 
-opt_segm  =struct( ...
-    'b_param', opt.b_param, ...
+opt_segm = struct( ...
+    'b_param', [job.options.biasreg job.options.biasfwhm], ...
     'b_write', opt.b_write, ...
-    'nGauss', [2 2 job.options.NbGaussian 2 3 4 2]); 
+    'nGauss', job.options.NbGaussian, ...
+    'mrf', job.options.mrf, ...
+    'cleanup', job.options.cleanup); 
 
 clear matlabbatch
 [matlabbatch] = batch_segment_l(fn_Img2segm, fn_TPMl, opt_segm);
@@ -210,7 +212,7 @@ if job.options.thrMPM && nMPM ~= 0
     end
 end
 
-fn_out.ICVmsk = {fn_ICV}
+fn_out.ICVmsk = {fn_ICV};
 if job.options.ICVmsk && nMPM ~= 0;
     for ii=1:nMPM
         fn_out.(sprintf('kMPM%d',ii)) = {deblank(fn_in{3}(ii,:))};
@@ -587,16 +589,19 @@ function [matlabbatch] = batch_segment_l(P,Ptpm_l,opt)
 % - opt   : structure with some options
 %   . b_param : bias correction parameters [regularisation fwhm]
 %   . b_write : write out bias corrected
+%   . nGauss  : Number of Gaussians per tissue class
+%   . mrf     : mrf parameter
+%   . cleanup : cleanup parameter
 
 % Multiple channels?
 nP = size(P,1);
 
-if nargin<3
-    opt = struct(...
-        'b_param',ones(nP,1)*[.00001 Inf],...
-        'b_write',zeros(nP,2), ...% By default no bias
-        'nGauss', [2 2 2 2 3 4 2]); 
-end
+% if nargin<3
+%     opt = struct(...
+%         'b_param',ones(nP,1)*[.00001 Inf],...
+%         'b_write',zeros(nP,2), ...% By default no bias
+%         'nGauss', [2 2 2 2 3 4 2]); 
+% end
 
 b_param = opt.b_param;
 b_write = opt.b_write;
@@ -635,8 +640,8 @@ for ii = 1:7
     matlabbatch{1}.spm.spatial.preproc.tissue(ii).warped = cr_warped(ii,:);
 end
 % Define other parameters
-matlabbatch{1}.spm.spatial.preproc.warp.mrf = 2; %% MRF is for noisy images, allows spatial reg basd on continuity - default 1 --> updated to 2
-matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 1; %% the cleanup is ad-hoc by default leave 1 - we can use spatial extent for further cleaning 
+matlabbatch{1}.spm.spatial.preproc.warp.mrf = opt.mrf;
+matlabbatch{1}.spm.spatial.preproc.warp.cleanup = opt.cleanup;
 % matlabbatch{1}.spm.spatial.preproc.warp.mrf = 0;
 % matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 0;
 matlabbatch{1}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
