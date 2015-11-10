@@ -66,6 +66,9 @@ imgOth.ufilter = '.*';
 imgOth.num     = [0 Inf];
 imgOth.val       = {''};
 
+%% OPTIONS for segmentation with lesion
+%_______________________________________________________________________
+
 % ---------------------------------------------------------------------
 % imgTpm TPM images
 % ---------------------------------------------------------------------
@@ -74,16 +77,11 @@ imgTpm.tag     = 'imgTpm';
 imgTpm.name    = 'Tissue probability maps';
 imgTpm.help    = {'Select the TPM images. '
     ['A TPM_les file will be created with lesions as', ...
-    ' a new tissue class in 3rd position!']};
+     ' a new tissue class in 3rd position!']};
 imgTpm.filter  = 'image';
 imgTpm.ufilter = '.*';
 imgTpm.num     = [1 1];
-tmp = fullfile(spm('dir'),'tpm','unwTPM_sl2.nii');
-if exist(tmp,'file')
-    imgTpm.val{1}  = {tmp}; % Allow the CRC (and MPM) specific tpm's.
-else
-    imgTpm.val{1}  = {fullfile(spm('dir'),'tpm','TPM.nii')}; % or use standard SPM tpm's
-end
+imgTpm.def     = @(val)crc_USwL_get_defaults('segment.imgTpm', val{:});
 
 % ---------------------------------------------------------------------
 % img4US Images to use for the segmentation
@@ -99,7 +97,7 @@ img4US.labels = {
     'all MPMs + others'
     }';
 img4US.values = {0 1 2};
-img4US.val    = {1};
+img4US.def     = @(val)crc_USwL_get_defaults('segment.img4US', val{:});
 
 % ---------------------------------------------------------------------
 % tpm4lesion Tissue probability map(s) affected by the lesion
@@ -115,7 +113,7 @@ tpm4lesion.labels = {
     'WM+GM+CSF'
     }';
 tpm4lesion.values = {0 1 2 3};
-tpm4lesion.val    = {1};
+tpm4lesion.def     = @(val)crc_USwL_get_defaults('segment.tpm4lesion', val{:});
 
 %--------------------------------------------------------------------------
 % biasreg Bias regularisation
@@ -167,7 +165,7 @@ biasreg.values = {
     1
     10
     }';
-biasreg.val = {1e-05}; % the default is almost nothing, assuming we use MPMs
+biasreg.def     = @(val)crc_USwL_get_defaults('segment.biasreg', val{:});
 
 %--------------------------------------------------------------------------
 % biasfwhm Bias FWHM
@@ -215,7 +213,7 @@ biasfwhm.values = {
     150
     Inf
     }';
-biasfwhm.val    = {Inf}; % No bias correction
+biasfwhm.def     = @(val)crc_USwL_get_defaults('segment.biasfwhm', val{:});
 
 % ---------------------------------------------------------------------
 % Number of Gaussians per tissue class used to model the lesion
@@ -228,7 +226,7 @@ NbGaussian.help    = {'Set the number of Gaussians per tissue class to model the
     'GM, WM, Lesion, CSF, Skull, Soft tissues, and Air']};
 NbGaussian.strtype = 'n';
 NbGaussian.num     = [1 7];
-NbGaussian.val     = {[2 2 2 2 3 4 2]};
+NbGaussian.def     = @(val)crc_USwL_get_defaults('segment.NbGaussian', val{:});
 
 % ---------------------------------------------------------------------
 % thrMPM Threshold outlier values from the MPM
@@ -248,7 +246,7 @@ thrMPM.labels = {
     'Yes'
     }';
 thrMPM.values = {0 1};
-thrMPM.val    = {1};
+thrMPM.def     = @(val)crc_USwL_get_defaults('segment.thrMPM', val{:});
 
 % ---------------------------------------------------------------------
 % ICVmsk Create ICV-mask and mask the MPMs
@@ -267,7 +265,7 @@ ICVmsk.labels = {
     'Yes'
     }';
 ICVmsk.values = {0 1};
-ICVmsk.val    = {1};
+ICVmsk.def     = @(val)crc_USwL_get_defaults('segment.ICVmsk', val{:});
 
 % ---------------------------------------------------------------------
 % thrLesion Threshold lesion mask based on spatial extent
@@ -278,7 +276,7 @@ thrLesion.name    = 'Thresholding the lesion mask';
 thrLesion.help    = {'Apply a spatial threshold on the lesion tissue class c3. ',...
     '0 means no threshold, otherwise indicate k value or ''Inf'''};
 thrLesion.num    = [1 1];
-thrLesion.val    = {0};
+thrLesion.def     = @(val)crc_USwL_get_defaults('segment.thrLesion', val{:});
 
 %--------------------------------------------------------------------------
 % mrf MRF Parameter
@@ -289,7 +287,7 @@ mrf.name    = 'MRF Parameter';
 mrf.help    = {'When tissue class images are written out, a few iterations of a simple Markov Random Field (MRF) cleanup procedure are run.  This parameter controls the strength of the MRF. Setting the value to zero will disable the cleanup.'};
 mrf.strtype = 'r';
 mrf.num     = [1 1];
-mrf.val     = {1};
+mrf.def     = @(val)crc_USwL_get_defaults('segment.mrf', val{:});
 
 %--------------------------------------------------------------------------
 % cleanup Clean up any partitions
@@ -308,7 +306,7 @@ cleanup.labels = {
     'Thorough Clean'
     }';
 cleanup.values = {0 1 2};
-cleanup.val    = {1};
+cleanup.def     = @(val)crc_USwL_get_defaults('segment.cleanup', val{:});
 
 % ---------------------------------------------------------------------
 % options Options
