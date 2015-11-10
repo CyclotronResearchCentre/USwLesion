@@ -27,19 +27,44 @@ function crc_USwL_defaults
 
 global uswl_def
 
-% Segmentation with lesion options
+% Parameters for the segmentation with lesion 
 %==========================================================================
 uswl_def.segment.imgTpm     = {fullfile(spm('dir'),'tpm','TPM.nii')};
 uswl_def.segment.img4US     = 1;
 uswl_def.segment.tpm4lesion = 1;
 uswl_def.segment.biasreg    = 1e-05; % almost nothing, assuming we use MPMs
 uswl_def.segment.biasfwhm   = Inf; % no bias correction
+uswl_def.segment.biaswr     = [0 0]; % Not saving bias corrected/field images
 uswl_def.segment.NbGaussian = [2 2 2 2 3 4 2];
 uswl_def.segment.thrMPM     = 1;
 uswl_def.segment.ICVmsk     = 1;
 uswl_def.segment.thrLesion  = 0;
 uswl_def.segment.mrf        = 2;
 uswl_def.segment.cleanup    = 1;
+
+% Parameters for the segmentation of masked anatomican reference (to build
+% the updated TPM)
+%==========================================================================
+uswl_def.msksegm.biasreg    = 1e-05; % almost nothing, assuming we use MPMs
+uswl_def.msksegm.biasfwhm   = Inf; % no bias correction
+uswl_def.msksegm.biaswr     = [0 0]; % Not saving bias corrected/field images
+uswl_def.msksegm.NbGaussian = [2 2 2 3 4 2]; % GM/WM/CSF/skull/scalp/air
+uswl_def.msksegm.mrf        = 2;
+uswl_def.msksegm.cleanup    = 1;
+
+% Processing parameters for the creation of the updated TPM
+%==========================================================================
+uswl_def.uTPM.minNr         = 8; % #voxels in lesion patch must be > minNr
+uswl_def.uTPM.nDilate       = 2; % # of dilation step
+uswl_def.uTPM.smoKern       = 2; % smoothing (in mm) of the warped lesion mask
+uswl_def.uTPM.tpm_ratio     = 100; % ratio of lesion/tpm
+uswl_def.uTPM.min_tpm       = 1e-6; % minimum value of tpm overall, as in standard spm's TPM
+uswl_def.uTPM.min_tpm_icv   = 1e-3; % minimum value of tpm in intracranial volume
+uswl_def.uTPM.b_write       = [0 0]; % not writing bias corrected images, as in standard spm's TPM
+
+% FIX ME:
+% The minimum volume of a lesion should be based on a volume expressed in
+% mm^3 and NOT voxels.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %-Prevent users from making direct calls to spm_defaults

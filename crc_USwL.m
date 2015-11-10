@@ -37,21 +37,17 @@ else
     nMPM = size(fn_in{3},1);
 end
 
-%% Define defaults processing parameters
-opt = struct( ...
-    'minNr', 8, ...    % #voxels in lesion patch must be > minNr
-    'nDilate', 2, ...  % # of dilation step
-    'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
-    'tpm_ratio', 100, ... % ratio of lesion/tpm
-    'min_tpm', 1e-6, ... % minimum value of tpm overall
-    'min_tpm_icv', 1e-3, ... % minimum value of tpm in intracranial volume
-    'b_write', [0 0] ... % not writing bias corrected images
-    );
-
-%     'thrMPM', true, ...    % threshold MPM images to avoid unsually large/negative values
-%     'ICVmskMPM', true, ... % mask the MPMs to keep the ICV = skull strip
-%     'b_param', [job.options.biasreg Inf], ... % bias correction
-
+%% Define processing parameters for the creation of the updated TPM
+opt = crc_USwL_get_defaults('uTPM');
+% opt = struct( ...
+%     'minNr', 8, ...    % #voxels in lesion patch must be > minNr
+%     'nDilate', 2, ...  % # of dilation step
+%     'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
+%     'tpm_ratio', 100, ... % ratio of lesion/tpm
+%     'min_tpm', 1e-6, ... % minimum value of tpm overall
+%     'min_tpm_icv', 1e-3, ... % minimum value of tpm in intracranial volume
+%     'b_write', [0 0] ... % not writing bias corrected images
+%     );
 
 %% 0. Clean up of the MPM images!
 % Need to know the order of the images, ideally MT, A, R1, R2 and should
@@ -165,7 +161,7 @@ end
 
 opt_segm = struct( ...
     'b_param', [job.options.biasreg job.options.biasfwhm], ...
-    'b_write', opt.b_write, ...
+    'b_write', job.options.b_write, ...
     'nGauss', job.options.NbGaussian, ...
     'mrf', job.options.mrf, ...
     'cleanup', job.options.cleanup); 
@@ -305,6 +301,10 @@ function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minNr,nDilate)
 % 2) Then grow the volume by 2 voxels [DEF]
 %   -> fn_dtMsk used for the masking for the 1st warping
 
+% FIX ME:
+% The minimum volume of a lesion should be based on a volume expressed in
+% mm^3 and NOT voxels.
+
 if nargin<3
     nDilate = 2;
 end
@@ -388,40 +388,27 @@ function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,sm
 pth_img = spm_file(fn_tMsk,'path');
 fn_ICV = spm_file(fn_kRef,'prefix','icv_');
 
+% get the defaults
+segm_def = crc_USwL_get_defaults('msksegm');
+
+% Build the batch structure
 matlabbatch{1}.cfg_basicio.file_dir.file_ops.cfg_named_file.name = 'LesionMask';
 matlabbatch{1}.cfg_basicio.file_dir.file_ops.cfg_named_file.files = {{fn_tMsk}};
 matlabbatch{2}.cfg_basicio.file_dir.file_ops.cfg_named_file.name = 'MaskedRefStruct';
 matlabbatch{2}.cfg_basicio.file_dir.file_ops.cfg_named_file.files = {{fn_kRef}};
 matlabbatch{3}.spm.spatial.preproc.channel.vols(1) = cfg_dep('Named File Selector: MaskedRefStruct(1) - Files', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{1}));
-matlabbatch{3}.spm.spatial.preproc.channel.biasreg = 0.001;
-matlabbatch{3}.spm.spatial.preproc.channel.biasfwhm = 60;
-matlabbatch{3}.spm.spatial.preproc.channel.write = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(1).tpm = {spm_file(fn_TPM,'number',1)};
-matlabbatch{3}.spm.spatial.preproc.tissue(1).ngaus = 1;
-matlabbatch{3}.spm.spatial.preproc.tissue(1).native = [1 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(1).warped = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(2).tpm = {spm_file(fn_TPM,'number',2)};
-matlabbatch{3}.spm.spatial.preproc.tissue(2).ngaus = 1;
-matlabbatch{3}.spm.spatial.preproc.tissue(2).native = [1 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(2).warped = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(3).tpm = {spm_file(fn_TPM,'number',3)};
-matlabbatch{3}.spm.spatial.preproc.tissue(3).ngaus = 2;
-matlabbatch{3}.spm.spatial.preproc.tissue(3).native = [1 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(3).warped = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(4).tpm = {spm_file(fn_TPM,'number',4)};
-matlabbatch{3}.spm.spatial.preproc.tissue(4).ngaus = 3;
-matlabbatch{3}.spm.spatial.preproc.tissue(4).native = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(4).warped = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(5).tpm = {spm_file(fn_TPM,'number',5)};
-matlabbatch{3}.spm.spatial.preproc.tissue(5).ngaus = 4;
-matlabbatch{3}.spm.spatial.preproc.tissue(5).native = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(5).warped = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(6).tpm = {spm_file(fn_TPM,'number',6)};
-matlabbatch{3}.spm.spatial.preproc.tissue(6).ngaus = 2;
-matlabbatch{3}.spm.spatial.preproc.tissue(6).native = [0 0];
-matlabbatch{3}.spm.spatial.preproc.tissue(6).warped = [0 0];
-matlabbatch{3}.spm.spatial.preproc.warp.mrf = 1; 
-matlabbatch{3}.spm.spatial.preproc.warp.cleanup = 1; %% the cleanup is ad-hoc by default leave 1 
+matlabbatch{3}.spm.spatial.preproc.channel.biasreg = segm_def.biasreg;
+matlabbatch{3}.spm.spatial.preproc.channel.biasfwhm = segm_def.biasfwhm;
+matlabbatch{3}.spm.spatial.preproc.channel.write = segm_def.biaswr;
+opt_native = [[1 0];[1 0];[1 0];[0 0];[0 0];[0 0]];
+for ii=1:6
+    matlabbatch{3}.spm.spatial.preproc.tissue(ii).tpm = {spm_file(fn_TPM,'number',ii)};
+    matlabbatch{3}.spm.spatial.preproc.tissue(ii).ngaus = segm_def.NbGaussian(ii);
+    matlabbatch{3}.spm.spatial.preproc.tissue(ii).native = opt_native(ii,:);
+    matlabbatch{3}.spm.spatial.preproc.tissue(ii).warped = [0 0];
+end
+matlabbatch{3}.spm.spatial.preproc.warp.mrf = segm_def.mrf; 
+matlabbatch{3}.spm.spatial.preproc.warp.cleanup = segm_def.cleanup; %% the cleanup is ad-hoc by default leave 1 
 matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
 matlabbatch{3}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{3}.spm.spatial.preproc.warp.fwhm = 0;

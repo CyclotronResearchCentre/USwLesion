@@ -215,6 +215,28 @@ biasfwhm.values = {
     }';
 biasfwhm.def     = @(val)crc_USwL_get_defaults('segment.biasfwhm', val{:});
 
+%--------------------------------------------------------------------------
+% biaswr Save Bias Corrected
+%--------------------------------------------------------------------------
+biaswr         = cfg_menu;
+biaswr.tag     = 'biaswr';
+biaswr.name    = 'Save Bias Corrected';
+biaswr.help    = {'This is the option to save a bias corrected version of your images from this channel, or/and the estimated bias field. MR images are usually corrupted by a smooth, spatially varying artifact that modulates the intensity of the image (bias). These artifacts, although not usually a problem for visual inspection, can impede automated processing of the images.  The bias corrected version should have more uniform intensities within the different types of tissues.'};
+biaswr.labels = {
+                'Save Nothing'
+                'Save Bias Corrected'
+                'Save Bias Field'
+                'Save Field and Corrected'
+                }';
+biaswr.values = {
+                [0 0]
+                [0 1]
+                [1 0]
+                [1 1]
+                }';
+% biaswr.val    = {[0 0]};
+biaswr.def     = @(val)crc_USwL_get_defaults('segment.biaswr', val{:});
+
 % ---------------------------------------------------------------------
 % Number of Gaussians per tissue class used to model the lesion
 % ---------------------------------------------------------------------
@@ -314,7 +336,7 @@ cleanup.def     = @(val)crc_USwL_get_defaults('segment.cleanup', val{:});
 options         = cfg_branch;
 options.tag     = 'options';
 options.name    = 'Options';
-options.val     = {imgTpm img4US biasreg biasfwhm NbGaussian tpm4lesion thrMPM ICVmsk mrf cleanup thrLesion};
+options.val     = {imgTpm img4US biasreg biasfwhm biaswr NbGaussian tpm4lesion thrMPM ICVmsk mrf cleanup thrLesion};
 options.help    = {'Some processing options.'};
 %_______________________________________________________________________
 
