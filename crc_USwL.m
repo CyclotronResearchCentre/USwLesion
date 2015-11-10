@@ -39,15 +39,6 @@ end
 
 %% Define processing parameters for the creation of the updated TPM
 opt = crc_USwL_get_defaults('uTPM');
-% opt = struct( ...
-%     'minNr', 8, ...    % #voxels in lesion patch must be > minNr
-%     'nDilate', 2, ...  % # of dilation step
-%     'smoKern', 2, ... % smoothing (in mm) of the warped lesion mask
-%     'tpm_ratio', 100, ... % ratio of lesion/tpm
-%     'min_tpm', 1e-6, ... % minimum value of tpm overall
-%     'min_tpm_icv', 1e-3, ... % minimum value of tpm in intracranial volume
-%     'b_write', [0 0] ... % not writing bias corrected images
-%     );
 
 %% 0. Clean up of the MPM images!
 % Need to know the order of the images, ideally MT, A, R1, R2 and should
