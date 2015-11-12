@@ -234,7 +234,6 @@ biaswr.values = {
                 [1 0]
                 [1 1]
                 }';
-% biaswr.val    = {[0 0]};
 biaswr.def     = @(val)crc_USwL_get_defaults('segment.biaswr', val{:});
 
 % ---------------------------------------------------------------------
