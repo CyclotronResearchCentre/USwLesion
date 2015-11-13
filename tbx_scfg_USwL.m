@@ -59,7 +59,7 @@ imgMPM.val       = {''};
 imgOth         = cfg_files;
 imgOth.tag     = 'imgOth';
 imgOth.name    = 'Other structural images';
-imgOth.help    = {'Select the other structural (e.g. FLAIR) images .'
+imgOth.help    = {'Select the other structural images, for example the FLAIR image that was used to create the "lesion mask".'
     'These will be segmented and warped into MNI space.'};
 imgOth.filter = 'image';
 imgOth.ufilter = '.*';
@@ -279,7 +279,7 @@ ICVmsk.help    = {['An ICV mask can be created from the reference structural ', 
     'image and applied onto the MPMs before the segmentation itself. ',...
     'This cleans up the images quite a bit and ', ...
     'is equivalent to "skull stripping". This helps, in some cases, the ', ...
-    'multi-channel segmentation of the MPMs.'], ...
+    'multi-channel segmentation of the MPMs.']
     ['Note that the TPMs are also masked so that the images to segment ',...
     'and TPMs match together.']
     'The masked MPM images are prefixed with ''k''.'};
