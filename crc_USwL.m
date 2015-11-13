@@ -69,10 +69,10 @@ if job.options.thrMPM && nMPM ~= 0
 end
 
 %% 1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
-% - remov the "small" lesion patches using a simple criteria: number of
-%   voxels in patch must be > minNR -> creates on the drive t_Msk
-% - then grow volume by 1 voxel     -> creates on the drive dt_Msk
-[fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minNr,opt.nDilate);
+% - remov the "small" lesion patches using a simple criteria: volume of 
+%   lesion patch must be > minVol -> creates on the drive t_Msk
+% - then grow volume by nDilate voxel(s) -> creates on the drive dt_Msk
+[fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minVol,opt.nDilate);
 
 %% 2. Apply the mask on the reference structural images -> k_sRef
 fn_kMTw = spm_file(fn_in{2},'prefix','k');
@@ -287,19 +287,16 @@ fn_out = Vc.fname;
 end
 
 %% STEP 1: Removing small lesion patches from mask
-function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minNr,nDilate)
+function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minVol,nDilate)
 % 1) Trim a mask image by removing bits that would be to small to really
-%    matter according to medical criteria (cf. E. Lommers):
+%    matter according to medical criteria 
+%   For example cf. E. Lommers and MS patients:
 %    "Lesions will ordinarily be larger than 3 mm in cross section"
-%    With 1x1x1mm^3 voxels, a cube of 2x2x2 voxels has a diagonal of
-%    sqrt(12)~3.4mm and counts 8 voxels -> minNr = 8 [DEF]
+%    A cube of 2x2x2 mm^3 has a diagonal of sqrt(12)~3.4mm and 
+%    and a volume of 8 mm^3 -> minVol = 8 [DEF]
 %   -> fn_tMsk used for the new TPM_ms
-% 2) Then grow the volume by 2 voxels [DEF]
+% 2) Then grow the volume by nDilate voxels [2, DEF]
 %   -> fn_dtMsk used for the masking for the 1st warping
-
-% FIX ME:
-% The minimum volume of a lesion should be based on a volume expressed in
-% mm^3 and NOT voxels.
 
 if nargin<3
     nDilate = 2;
@@ -312,6 +309,8 @@ end
 V = spm_vol(P_in);
 [Msk,XYZ] = spm_read_vols(V);
 XYZvx = V.mat\[XYZ ; ones(1,size(XYZ,2))];
+vx_vol = abs(det(V.mat(1:3,1:3)));
+minNr = minVol/vx_vol;
 
 % 2) Clean up
 lMsk  = find(Msk(:)>0);

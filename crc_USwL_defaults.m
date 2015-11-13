@@ -54,7 +54,7 @@ uswl_def.msksegm.cleanup    = 1;
 
 % Processing parameters for the creation of the updated TPM
 %==========================================================================
-uswl_def.uTPM.minNr         = 8; % #voxels in lesion patch must be > minNr
+uswl_def.uTPM.minVol        = 8; % volume of lesion patch must be > minVol (in mm^3)
 uswl_def.uTPM.nDilate       = 2; % # of dilation step
 uswl_def.uTPM.smoKern       = 2; % smoothing (in mm) of the warped lesion mask
 uswl_def.uTPM.tpm_ratio     = 100; % ratio of lesion/tpm
@@ -66,10 +66,6 @@ uswl_def.uTPM.b_write       = [0 0]; % not writing bias corrected images, as in 
 %==========================================================================
 uswl_def.tMPM.strMPM = {'_A', '_MT', '_R1', '_R2'}; % filename parts
 uswl_def.tMPM.thrMPM = [200 5 2000 100]; % Thresholds for A, MT, R1 & R2.
-
-% FIX ME:
-% The minimum volume of a lesion should be based on a volume expressed in
-% mm^3 and NOT voxels.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %-Prevent users from making direct calls to spm_defaults
