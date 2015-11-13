@@ -1,6 +1,7 @@
 function fn_out = crc_USwL(job)
 % Doing all the work of "Unified segmentation with lesion".
 % Here are the main steps:
+%   0. Clean up of the MPM images, based on each maps value range
 %   1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
 %       - remov the "small" MS patches using a simple criteria: number of
 %         voxels in patch must be > minNR    -> t_Msk
@@ -103,6 +104,7 @@ if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs
         fn_tmp = char(fn_tmp,Vo.fname);
     end
     fn_in{3} = fn_tmp(2:end,:);
+    fn_swICV = spm_file(fn_ICV,'prefix','sw');
 end
 
 %% 4. Update the TPMs to include a 7th tissue class -> TPMms
@@ -113,7 +115,9 @@ opt_tpm = struct(...
     'tpm_ratio', opt.tpm_ratio, ...
     'min_tpm_icv', opt.min_tpm_icv, ...
     'min_tpm', opt.min_tpm);
-
+if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the TPMs
+    opt_tpm.fn_swICV = fn_swICV;
+end
 fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk); % that creates the new tissue class tmp
 
 %% 5. Do the segmentation with the new TPM_ms
@@ -362,10 +366,12 @@ end
 function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
 % [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
 % This includes:
-% - segmentation of the masked structural
-% - writing out + smoothing the normalized lesion mask
-% - creating the ICV-mask from c1/c2/c3/lesion-mask
-% - deleting temporary files
+% [1,2] defining inputs
+% [3] segmentation of the masked structural
+% [4,5] writing out + smoothing the normalized lesion mask
+% [6,7,8] creating the ICV-mask from c1/c2/c3/lesion-mask
+% [9,10] writing out + smoothing the normalized ICV-mask
+% [11] deleting temporary files
 %
 % INPUT:
 % - fn_kRef : masked structural image used for the warping estimation
@@ -378,7 +384,7 @@ function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,sm
 % - fn_ICV : file name to ICV mask created
 
 pth_img = spm_file(fn_tMsk,'path');
-fn_ICV = spm_file(fn_kRef,'prefix','icv_');
+fn_ICV = spm_file(spm_file(fn_kRef,'prefix','icv_'),'filename');
 
 % get the defaults
 segm_def = crc_USwL_get_defaults('msksegm');
@@ -442,14 +448,26 @@ matlabbatch{8}.spm.util.imcalc.options.dmtx = 0;
 matlabbatch{8}.spm.util.imcalc.options.mask = 0;
 matlabbatch{8}.spm.util.imcalc.options.interp = 1;
 matlabbatch{8}.spm.util.imcalc.options.dtype = 2;
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(1) = cfg_dep('Segment: Seg Params', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','param', '()',{':'}));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(2) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(3) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(4) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(5) = cfg_dep('Segment: Forward Deformations', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','fordef', '()',{':'}));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(6) = cfg_dep('Image Calculator: ImCalc Computed Image: tmp.nii', substruct('.','val', '{}',{6}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.files(7) = cfg_dep('Smooth: Smoothed Images', substruct('.','val', '{}',{7}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{9}.cfg_basicio.file_dir.file_ops.file_move.action.delete = false;
+matlabbatch{9}.spm.spatial.normalise.write.subj.def(1) = cfg_dep('Segment: Forward Deformations', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','fordef', '()',{':'}));
+matlabbatch{9}.spm.spatial.normalise.write.subj.resample = {fullfile(pth_img,fn_ICV)};
+matlabbatch{9}.spm.spatial.normalise.write.woptions.bb = [-90 -126 -72 ; 90 90 108];
+matlabbatch{9}.spm.spatial.normalise.write.woptions.vox = [1.5 1.5 1.5];
+matlabbatch{9}.spm.spatial.normalise.write.woptions.interp = 4;
+matlabbatch{10}.spm.spatial.smooth.data(1) = cfg_dep('Normalise: Write: Normalised Images (Subj 1)', substruct('.','val', '{}',{9}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('()',{1}, '.','files'));
+matlabbatch{10}.spm.spatial.smooth.fwhm = smoKern*[1 1 1];
+matlabbatch{10}.spm.spatial.smooth.dtype = 16;
+matlabbatch{10}.spm.spatial.smooth.im = 0;
+matlabbatch{10}.spm.spatial.smooth.prefix = 's';
+matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(1) = cfg_dep('Segment: Seg Params', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','param', '()',{':'}));
+matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(2) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
+matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(3) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
+matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(4) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
+matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(5) = cfg_dep('Segment: Forward Deformations', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','fordef', '()',{':'}));
+matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(6) = cfg_dep('Image Calculator: ImCalc Computed Image: tmp.nii', substruct('.','val', '{}',{6}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
+matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(7) = cfg_dep('Smooth: Smoothed Images', substruct('.','val', '{}',{7}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
+matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.action.delete = false;
+
+fn_ICV = fullfile(pth_img,fn_ICV);
 
 end
 
@@ -466,6 +484,7 @@ function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 %     .tpm_ratio : ration between WM and lesion
 %     .min_tpm_icv : minimum value in intracranial volume
 %     .min_tpm : minum value overall
+%     .fn_swICV : [optional] smoothed-warped ICV mask to apply on TPMs
 % - fn_swtMsk : filename of smoothed normalized cleaned lesion mask, to be
 %               used to create the lesion tissue class
 
@@ -496,7 +515,7 @@ tpm_l = spm_read_vols(Vl);
 % 2) ensure minium value all over
 % 3) concatenate by setting lesion at #7 & adjust 'other' class
 tpm_Lu = (1-1/opt.tpm_ratio)*tpm_l.*tpm_healthy; % update lesion tpm
-tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV, ICV defined based on WM > min_tpm_icv
 tpm_ext = cat(4,tpm_orig,tpm_Lu);
 switch opt.tpm4lesion % update healthy tissues
     case 0 % GM only
@@ -536,7 +555,20 @@ switch opt.tpm4lesion % update healthy tissues
     otherwise
         error('Wrong tissue flag');
 end
-tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,[1:5 7]),4); % update 'other'
+
+% Mask out with swICV, if provided
+if isfield(opt,'fn_swICV');
+    V_swICV = spm_vol(opt.fn_swICV);
+    swICV = spm_read_vols(V_swICV);
+    for ii = [1:5 7]
+        tmp = tpm_ext(:,:,:,ii).*swICV;
+        tmp(tmp<opt.min_tpm) = opt.min_tpm;
+        tpm_ext(:,:,:,ii) = tmp;
+    end
+end
+
+ % Update 'other', which is in 6th position
+tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,[1:5 7]),4);
 
 % 4) save the TPMl, with lesion in #3, in subject's data directory.
 fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'), ...
