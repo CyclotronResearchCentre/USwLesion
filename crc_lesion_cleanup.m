@@ -63,3 +63,13 @@ V.private.descrip = V.descrip;
 spm_write_vol(V,extent_map);
 fprintf('%s created \n',V.fname)
 
+% to make an extent map do
+% for i=1:num
+%     idx=idxall(inis(i):ends(i));
+%     extent_map(idx)=nv(i);
+% end
+% V.fname = [root filesep 'extent_map_' name ext];
+% V.descrip = [V.descrip ' spatial extent map'];
+% V.private.descrip = V.descrip;
+% spm_write_vol(V,extent_map);
+% fprintf('%s created \n',V.fname)
