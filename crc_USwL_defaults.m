@@ -62,6 +62,11 @@ uswl_def.uTPM.min_tpm       = 1e-6; % minimum value of tpm overall, as in standa
 uswl_def.uTPM.min_tpm_icv   = 1e-3; % minimum value of tpm in intracranial volume
 uswl_def.uTPM.b_write       = [0 0]; % not writing bias corrected images, as in standard spm's TPM
 
+% Thresholding the MPM images
+%==========================================================================
+uswl_def.tMPM.strMPM = {'_A', '_MT', '_R1', '_R2'}; % filename parts
+uswl_def.tMPM.thrMPM = [200 5 2000 100]; % Thresholds for A, MT, R1 & R2.
+
 % FIX ME:
 % The minimum volume of a lesion should be based on a volume expressed in
 % mm^3 and NOT voxels.

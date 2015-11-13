@@ -45,8 +45,9 @@ opt = crc_USwL_get_defaults('uTPM');
 % check with their filename? based on '_MT', '_A', '_R1', '_R2'?
 fn_in_3_orig = fn_in{3};
 if job.options.thrMPM && nMPM ~= 0
-    strMPM = {'_A', '_MT', '_R1', '_R2'}; nSt = numel(strMPM);
-    thrMPM = [200 5 2000 100]; % Thresholds for A, MT, R1 & R2.
+    strMPM = crc_USwL_get_defaults('tMPM.strMPM');
+    thrMPM = crc_USwL_get_defaults('tMPM.thrMPM');
+    nSt = numel(strMPM);
     fn_tmp = [];
     for ii=1:nMPM % Loop over MPM files
         mtch = zeros(nSt,1);
