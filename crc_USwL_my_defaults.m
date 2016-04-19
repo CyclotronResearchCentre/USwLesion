@@ -14,10 +14,12 @@ function crc_USwL_my_defaults
 % Cyclotron Research Centre, University of Liege, Belgium
 
 global uswl_def
-uswl_def.segment.NbGaussian = [3 2 2 2 3 4 2];
-uswl_def.segment.mrf        = 1;
+uswl_def.segment.NbGaussian = [3 2 2 2 1 1 1];
+uswl_def.segment.mrf        = 2;
 uswl_def.segment.cleanup    = 0;
 uswl_def.segment.imgTpm     = {fullfile(spm('dir'),'tpm','unwTPM_sl2.nii')};
+uswl_def.segment.thrMPM     = 1;
+uswl_def.segment.ICVmsk     = 1;
 
 return
 
