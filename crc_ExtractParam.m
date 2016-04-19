@@ -74,7 +74,7 @@ res.match = struct( ...
 
 %% 3. Volumes
 clear matlabbatch
-fn_seg8 = spm_select('FPList',pth,'^.*_seg8\.mat$');
+fn_seg8 = spm_select('FPList',pth,'^kt.*_seg8\.mat$');
 matlabbatch{1}.spm.util.tvol.matfiles = {fn_seg8};
 matlabbatch{1}.spm.util.tvol.tmax = 4;
 matlabbatch{1}.spm.util.tvol.mask = {fullfile(spm('dir'),'tpm','mask_ICV.nii,1')};
