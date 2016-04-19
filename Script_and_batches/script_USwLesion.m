@@ -43,7 +43,7 @@ for ii=1:Ndirs
     matlabbatch{3}.cfg_basicio.file_dir.file_ops.cfg_named_file.files = {{fn_FLAIR}};
     save(['batch_USwL_',dirs(ii,:)],'matlabbatch')
 %     % Execute batch
-%      cfg_util('run',matlabbatch);
+%      spm_jobman('run',matlabbatch);
 end
 
 %% Next step:
