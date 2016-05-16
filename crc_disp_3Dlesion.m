@@ -8,7 +8,7 @@ function [param_out] = crc_disp_3Dlesion(varargin)
 % INPUT for a new plot
 % - Ps : filename of structural image (or structural image 3D matrix for
 %        plot update)
-% - Pl : filename of structural image (not needed for plot update)
+% - Pl : filename of lesion mask image (not needed for plot update)
 % - param = set of display parameters
 %   .pov : point of view for camera, if left empty -> default value in code
 %   .cut_ax : cuting perpendicular to axis 'x'/'y'/'z'
@@ -19,7 +19,7 @@ function [param_out] = crc_disp_3Dlesion(varargin)
 %   .col_blobs : colour for blobs, def. 'green'
 %   .rotate3D : allow manual 3D rotation in plot, def. false
 %   .p_fig : figure number (Def. create a new figure)
-%   .fig_pos : figure pisition/size (Def. ~a quarter of the screen)
+%   .fig_pos : figure position/size (Def. ~a quarter of the screen)
 %
 % OUPUT 
 % - param_out : the same as the input parameters with some extra fields
