@@ -1,30 +1,47 @@
-function [mJ,overlap] = image_overlap(img1,img2)
+function [mJ,overlap] = image_overlap(img1,img2,opt)
 
-% This function computes the modified Jaccard index and the percentage 
-% overlap between two binary 3D images.
+% This function computes the matching between 2 binary 3D images, based on
+% different measures:
+% - the modified Jaccard index
+% - the percentage overlap between the two binary images.
 %
-% FORMAT: overlap = percent_overlap(img1,img2)
-% INPUT: img1 and img2 are two image names or matrices (computes mJ)
-%        img1 can also be seen as a source image and img2 as the reference
-%        (ground truth) image to computes overlap of source to the reference
-% OUTPUT: mJ is the modified Jaccard index
-%         overlap is a structure with:
+% FORMAT:
+%   overlap = percent_overlap(img1,img2,opt)
+%
+% INPUT:
+%   - img1 and img2 are two image names or matrices (computes mJ)
+%     img1 can also be seen as a source image and img2 as the reference
+%     (ground truth) image to computes overlap of source to the reference
+%   - opt is a structure with a few processing options
+%       .thr is the threshold applied to both images to binarize them,
+%            otherwise any non-zero value is considered as 1. By default
+%            thr=0, i.e. no thresholding is performed.
+%
+% OUTPUT:
+%   - mJ is the modified Jaccard index
+%   - overlap is a structure with:
 %                 overlap.tp: percentage of img1 roi inside img2 roi
 %                             this is the true positive rate (sensitivity)
-%                 overlap.fp: percentage of img1 roi inside img2 0  
+%                 overlap.fp: percentage of img1 roi inside img2 0
 %                             this is the false positive rate
-%                 overlap.tn: percentage of img1 0 inside img2 0  
+%                 overlap.tn: percentage of img1 0 inside img2 0
 %                             this is the true negative rate
 %                 overlap.fn: percentage of img1 0 inside img2 roi
 %                             this is the false negative rate (specificity)
 %                 overlap.mcc: Matthews correlation coefficient
 %          <https://en.wikipedia.org/wiki/Matthews_correlation_coefficient>
 %
-% To execute this function using MRI images, the software SPM needs to be 
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+% NOTES:
+% To execute this function using MRI images, the software SPM needs to be
 % in your matlab path - see SPM <http://www.fil.ion.ucl.ac.uk/spm/>
+%__________________________________________________________________________
 %
 % Cyril R Pernet, 6 May 2016
-% The University of Edinburgh, NeuroImaging Sciences
+% The University of Edinburgh, NeuroImaging Sciences, UK.
+%
+% Christophe Phillips, for some added features
+% University of Liège, GIGA - Research, Belgium
 
 %%
 % The Jaccard index (1910) is defined as
@@ -38,10 +55,10 @@ function [mJ,overlap] = image_overlap(img1,img2)
 if nargin == 0
     help image_overlap
     disp(' '); disp('a 2D exemple is displayed in the figure')
-
+    
     % this is a simple code check
     index1 = 1:6; index2 = 7:12;
-    figure; 
+    figure;
     for move = 1:4
         img1 = zeros(12,12); img2 = img1;
         img1(index1,index1) = 1;
@@ -54,10 +71,19 @@ if nargin == 0
     end
     
     return
-
-elseif nargin ~=2
-    error('two inputs are expected - FORMAT: overlap = percent_overlap(img1,img2)')
+    
+elseif nargin <2
+    error('two inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2)')
+    
+elseif nargin == 2
+    opt = [];
+    
 end
+
+%%
+% Define the default values for options and fill in opt structure
+opt_def = struct('thr',0);
+opt = crc_check_flag(opt_def,opt);
 
 %%
 % Check fisrt images in: they need to be of the same size and to have 0s
@@ -65,19 +91,19 @@ end
 % check format
 if ischar(img1)
     if exist(img1,'file')
-    V1 = spm_vol(img1); 
-    img1 =spm_read_vols(img1);
+        V1 = spm_vol(img1);
+        img1 =spm_read_vols(V1);
     else
-       error(sprintf('the file %s doesn''t exist',fileparts(img1))) 
+        error('the file %s doesn''t exist',spm_file(img1,'filename'))
     end
 end
 
 if ischar(img2)
     if exist(img2,'file')
-    V2 = spm_vol(img2); 
-    img2 =spm_read_vols(img2);
+        V2 = spm_vol(img2);
+        img2 =spm_read_vols(V2);
     else
-       error(sprintf('the file %s doesn''t exist',fileparts(img2))) 
+        error('the file %s doesn''t exist',spm_file(img2,'filename'))
     end
 end
 
@@ -86,15 +112,15 @@ if any(size(img1)~=size(img2))
     error('img1 and img2 are not of the same size')
 end
 
-%% 
+%%
 % *Compute the overlap using images as binary vectors*
- 
-img1 = img1(:) > 0;
-img2 = img2(:) > 0;
+
+img1 = img1(:) > opt.thr;
+img2 = img2(:) > opt.thr;
 I = sum((img1+img2)==2);
 mJ = I / (sum(img1)+sum(img2)-I);
 
-%% 
+%%
 % *Compute percentage of overalp*
 
 if nargout == 2
@@ -103,10 +129,10 @@ if nargout == 2
     tp = sum(ismember(find(img1),find(img2))) / sum(img2);
     overlap.tp = tp*100;
     
-    % percentage of img1 0 inside img2 0  
+    % percentage of img1 0 inside img2 0
     tn = sum(ismember(find(img1==0),find(img2==0))) / sum(img2==0);
     overlap.tn = tn*100;
-
+    
     % percentage of img1 roi inside img2 0
     fp = sum(ismember(find(img1),find(img2==0))) / sum(img2==0);
     overlap.fp = fp*100;
