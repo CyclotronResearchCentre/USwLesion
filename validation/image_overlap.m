@@ -1,4 +1,4 @@
-function [mJ,overlap] = image_overlap(img1,img2,opt)
+function overlap = image_overlap(img1,img2,opt)
 
 % This function computes the matching between 2 binary 3D images, based on
 % different measures:
@@ -18,18 +18,30 @@ function [mJ,overlap] = image_overlap(img1,img2,opt)
 %            thr=0, i.e. no thresholding is performed.
 %
 % OUTPUT:
-%   - mJ is the modified Jaccard index
-%   - overlap is a structure with:
-%                 overlap.tp: percentage of img1 roi inside img2 roi
-%                             this is the true positive rate (sensitivity)
-%                 overlap.fp: percentage of img1 roi inside img2 0
-%                             this is the false positive rate
-%                 overlap.tn: percentage of img1 0 inside img2 0
-%                             this is the true negative rate
-%                 overlap.fn: percentage of img1 0 inside img2 roi
-%                             this is the false negative rate (specificity)
-%                 overlap.mcc: Matthews correlation coefficient
-%          <https://en.wikipedia.org/wiki/Matthews_correlation_coefficient>
+%   - overlap is a structure with the followign measures
+%       .tp:    percentage of img1 roi inside img2 roi this is the true
+%               positive rate (sensitivity)
+%       .fp: percentage of img1 roi inside img2 0 this is the false
+%               positive rate
+%       .tn: percentage of img1 0 inside img2 0 this is the true negative
+%               rate
+%       .fn: percentage of img1 0 inside img2 roi this is the false
+%               negative rate (specificity)
+%       .mcc: Matthews correlation coefficient  (see Ref here under)
+%       .mJ: the modified Jaccard index (see Ref here under)
+%
+%
+% REFERENCES:
+% The Jaccard index (1910) is defined as
+%   J(A,B) = N(intersect(A,B)) / N(union(A,B))
+%   <https://en.wikipedia.org/wiki/Jaccard_index>
+%
+% The modified Jaccard index follows Maitra (2010)
+%   W(A,B) = N(intersect(A,B) / N(A)+N(B)-N(intersect(A,B))
+%   <http://www.ncbi.nlm.nih.gov/pubmed/19963068>
+%
+% The Matthews correlation coefficient is described here
+%   <https://en.wikipedia.org/wiki/Matthews_correlation_coefficient>
 %
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 % NOTES:
@@ -44,14 +56,7 @@ function [mJ,overlap] = image_overlap(img1,img2,opt)
 % University of Liège, GIGA - Research, Belgium
 
 %%
-% The Jaccard index (1910) is defined as
-% J(A,B) = N(intersect(A,B)) / N(union(A,B))
-% <https://en.wikipedia.org/wiki/Jaccard_index>
-%%
-% The modified Jaccard index follows Maitra (2010)
-% W(A,B) = N(intersect(A,B) / N(A)+N(B)-N(intersect(A,B))
-% <http://www.ncbi.nlm.nih.gov/pubmed/19963068>
-
+%  Simple example with synthetic images
 if nargin == 0
     help image_overlap
     disp(' '); disp('a 2D exemple is displayed in the figure')
@@ -118,31 +123,30 @@ end
 img1 = img1(:) > opt.thr;
 img2 = img2(:) > opt.thr;
 I = sum((img1+img2)==2);
-mJ = I / (sum(img1)+sum(img2)-I);
+overlap.mJ = I / (sum(img1)+sum(img2)-I);
 
 %%
 % *Compute percentage of overalp*
 
-if nargout == 2
-    
-    % percentage of img1 roi inside img2 roi
-    tp = sum(ismember(find(img1),find(img2))) / sum(img2);
-    overlap.tp = tp*100;
-    
-    % percentage of img1 0 inside img2 0
-    tn = sum(ismember(find(img1==0),find(img2==0))) / sum(img2==0);
-    overlap.tn = tn*100;
-    
-    % percentage of img1 roi inside img2 0
-    fp = sum(ismember(find(img1),find(img2==0))) / sum(img2==0);
-    overlap.fp = fp*100;
-    
-    % percentage of img1 0 inside img2 roi
-    fn = sum(ismember(find(img1==0),find(img2))) / sum(img2);
-    overlap.fn = fn *100;
-    
-    % Matthews correlation coefficient
-    overlap.mcc = ((tp*tn)-(fp*fn))/sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn));
+% percentage of img1 roi inside img2 roi
+tp = sum(ismember(find(img1),find(img2))) / sum(img2);
+overlap.tp = tp*100;
+
+% percentage of img1 0 inside img2 0
+tn = sum(ismember(find(img1==0),find(img2==0))) / sum(img2==0);
+overlap.tn = tn*100;
+
+% percentage of img1 roi inside img2 0
+fp = sum(ismember(find(img1),find(img2==0))) / sum(img2==0);
+overlap.fp = fp*100;
+
+% percentage of img1 0 inside img2 roi
+fn = sum(ismember(find(img1==0),find(img2))) / sum(img2);
+overlap.fn = fn *100;
+
+% Matthews correlation coefficient
+overlap.mcc = ((tp*tn)-(fp*fn))/sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn));
+
 end
 
 
