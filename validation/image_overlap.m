@@ -80,7 +80,7 @@ if nargin == 0
     return
     
 elseif nargin <2
-    error('At two inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,opt)')
+    error('At least two inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,opt)')
     
 elseif nargin == 2
     % Define the default values for options and fill in opt structure
