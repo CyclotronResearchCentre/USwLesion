@@ -16,6 +16,8 @@ function overlap = image_overlap(img1,img2,opt)
 %       .thr is the threshold applied to both images to binarize them,
 %            otherwise any non-zero value is considered as 1. By default
 %            thr=0, i.e. no thresholding is performed.
+%       .mask is a binary image indicating which pixels/voxels
+%        have to be taken into account (name or matrix) 
 %
 % OUTPUT:
 %   - overlap is a structure with the followign measures
@@ -53,7 +55,7 @@ function overlap = image_overlap(img1,img2,opt)
 % The University of Edinburgh, NeuroImaging Sciences, UK.
 %
 % Christophe Phillips, for some added features
-% University of Liège, GIGA - Research, Belgium
+% University of Liege, GIGA - Research, Belgium
 
 %%
 %  Simple example with synthetic images
@@ -78,17 +80,13 @@ if nargin == 0
     return
     
 elseif nargin <2
-    error('two inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2)')
+    error('At two inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,opt)')
     
 elseif nargin == 2
-    opt = [];
-    
+    % Define the default values for options and fill in opt structure
+    opt_def = struct('thr',0);
+    opt = crc_check_flag(opt_def,opt);
 end
-
-%%
-% Define the default values for options and fill in opt structure
-opt_def = struct('thr',0);
-opt = crc_check_flag(opt_def,opt);
 
 %%
 % Check fisrt images in: they need to be of the same size and to have 0s
@@ -117,11 +115,46 @@ if any(size(img1)~=size(img2))
     error('img1 and img2 are not of the same size')
 end
 
+%% 
+% *Clean-up images using the mask*
+
+if isfield(opt,'mask')
+    if ischar(opt.mask)
+        if exist(opt.mask,'file')
+            V3 = spm_vol(opt.mask);
+            mask = spm_read_vols(V3);
+        else
+            error(sprintf('the file %s doesn''t exist',fileparts(mask)))
+        end
+    end
+    
+    if any(size(img1)~=size(mask))
+        error('the mask is not of the same size as input images')
+    end
+    
+    % invert the mask as logical
+    if isnan(sum(mask(:))) 
+        mask(~isnan(mask)) = 0;
+        mask(isnan(mask)) = 1;
+    else
+        mask = (mask==0);
+    end
+end
+
 %%
 % *Compute the overlap using images as binary vectors*
 
-img1 = img1(:) > opt.thr;
-img2 = img2(:) > opt.thr;
+if nargin == 2
+    img1 = img1(:) > opt.thr;
+    img2 = img2(:) > opt.thr;
+else
+    % remove inverted mask region
+    img1 = img1(:); img1(mask(:)) = [];
+    img2 = img2(:); img2(mask(:)) = [];
+    img1 = img1 > opt.thr;
+    img2 = img2 > opt.thr;
+end
+
 I = sum((img1+img2)==2);
 overlap.mJ = I / (sum(img1)+sum(img2)-I);
 
