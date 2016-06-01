@@ -65,27 +65,28 @@ if nargin == 0
     
     % this is a simple code check
     index1 = 1:6; index2 = 7:12;
-    figure;
+    figure; opt.thr = 0;
     for move = 1:4
         img1 = zeros(12,12); img2 = img1;
         img1(index1,index1) = 1;
         img2(index2,index2) = 1;
-        [mJ,overlap] = image_overlap(img1,img2);
+        overlap = image_overlap(img1,img2,opt);
         subplot(2,2,move); imagesc(img1+img2); drawnow
-        title(['overlap ' num2str(overlap.tp) '% mJ=' num2str(mJ)])
+        title(['overlap ' num2str(overlap.tp) '% mJ=' num2str(overlap.mJ)])
         index1 = index1+1;
         index2 = index2 -1;
     end
     
     return
     
-elseif nargin <2
-    error('At least two inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,opt)')
-    
 elseif nargin == 2
     % Define the default values for options and fill in opt structure
     opt_def = struct('thr',0);
     opt = crc_check_flag(opt_def,opt);
+
+elseif nargin <2 || nargin > 3
+    error('Two or three inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,option)')
+    
 end
 
 %%
@@ -139,20 +140,22 @@ if isfield(opt,'mask')
     else
         mask = (mask==0);
     end
+else
+    mask = [];
 end
 
 %%
 % *Compute the overlap using images as binary vectors*
 
-if nargin == 2
-    img1 = img1(:) > opt.thr;
-    img2 = img2(:) > opt.thr;
-else
+if ~isempty(mask)
     % remove inverted mask region
     img1 = img1(:); img1(mask(:)) = [];
     img2 = img2(:); img2(mask(:)) = [];
     img1 = img1 > opt.thr;
     img2 = img2 > opt.thr;
+else
+    img1 = img1(:) > opt.thr;
+    img2 = img2(:) > opt.thr;
 end
 
 I = sum((img1+img2)==2);

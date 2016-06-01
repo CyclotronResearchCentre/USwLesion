@@ -1,6 +1,6 @@
 function crc_lesion_cleanup(P,k)
 
-% this is a silly routine the cleanup the lesion mask (c3) based on spatial
+% this is a silly routine to cleanup the lesion mask (c3) based on spatial
 % extend, during segmentation some voxels may endup misclassified and if
 % we know we have lesions of a given size, we can use spatial extend to
 % cleanup
@@ -35,7 +35,7 @@ extent_map = zeros(size(data));
 clustered_map=clustered_map(:);
 nv=histc(clustered_map,0:num);
 [~,idxall]=sort(clustered_map,'ascend');
-idxall(1:nv(1))=[]; nv(1)=[];
+idxall(1:nv(1))=[]; nv(1)=[]; % remove 1st bin ie 0s
 ends=cumsum(nv);inis=ends-nv+1;
 
 % make the new map - if cluster >=k then = 1
