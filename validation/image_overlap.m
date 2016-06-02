@@ -17,7 +17,7 @@ function overlap = image_overlap(img1,img2,opt)
 %            otherwise any non-zero value is considered as 1. By default
 %            thr=0, i.e. no thresholding is performed.
 %       .mask is a binary image indicating which pixels/voxels
-%        have to be taken into account (name or matrix) 
+%            have to be taken into account (name or matrix)
 %
 % OUTPUT:
 %   - overlap is a structure with the followign measures
@@ -60,34 +60,22 @@ function overlap = image_overlap(img1,img2,opt)
 %%
 %  Simple example with synthetic images
 if nargin == 0
-    help image_overlap
-    disp(' '); disp('a 2D exemple is displayed in the figure')
-    
-    % this is a simple code check
-    index1 = 1:6; index2 = 7:12;
-    figure; opt.thr = 0;
-    for move = 1:4
-        img1 = zeros(12,12); img2 = img1;
-        img1(index1,index1) = 1;
-        img2(index2,index2) = 1;
-        overlap = image_overlap(img1,img2,opt);
-        subplot(2,2,move); imagesc(img1+img2); drawnow
-        title(['overlap ' num2str(overlap.tp) '% mJ=' num2str(overlap.mJ)])
-        index1 = index1+1;
-        index2 = index2 -1;
-    end
-    
+    display_help_and_example
     return
     
 elseif nargin == 2
-    % Define the default values for options and fill in opt structure
-    opt_def = struct('thr',0);
-    opt = crc_check_flag(opt_def,opt);
-
+    % Set opt to [] in order to use the default options
+    opt = [];
+    
 elseif nargin <2 || nargin > 3
     error('Two or three inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,option)')
     
 end
+
+%%
+% Default values
+opt_def = struct('thr',0,'mask',[]);
+opt = crc_check_flag(opt_def,opt);
 
 %%
 % Check fisrt images in: they need to be of the same size and to have 0s
@@ -116,16 +104,17 @@ if any(size(img1)~=size(img2))
     error('img1 and img2 are not of the same size')
 end
 
-%% 
+%%
 % *Clean-up images using the mask*
 
-if isfield(opt,'mask')
-    if ischar(opt.mask)
-        if exist(opt.mask,'file')
-            V3 = spm_vol(opt.mask);
+mask = opt.mask;  % a mask field will be there, empty or not.
+if ~isempty(mask) % load if not empty
+    if ischar(mask)
+        if exist(mask,'file')
+            V3 = spm_vol(mask);
             mask = spm_read_vols(V3);
         else
-            error(sprintf('the file %s doesn''t exist',fileparts(mask)))
+            error('the file %s doesn''t exist',fileparts(mask))
         end
     end
     
@@ -134,14 +123,12 @@ if isfield(opt,'mask')
     end
     
     % invert the mask as logical
-    if isnan(sum(mask(:))) 
+    if isnan(sum(mask(:)))
         mask(~isnan(mask)) = 0;
         mask(isnan(mask)) = 1;
     else
         mask = (mask==0);
     end
-else
-    mask = [];
 end
 
 %%
@@ -185,4 +172,28 @@ overlap.mcc = ((tp*tn)-(fp*fn))/sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn));
 
 end
 
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% SUBFUNCTIONS
+%
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+function display_help_and_example
+% Simple function to display the help and an example of its use.
+help image_overlap
+disp(' '); disp('a 2D exemple is displayed in the figure')
+
+% this is a simple code check
+index1 = 1:6; index2 = 7:12;
+figure;
+for move = 1:4
+    img1 = zeros(12,12); img2 = img1;
+    img1(index1,index1) = 1;
+    img2(index2,index2) = 1;
+    overlap = image_overlap(img1,img2);
+    subplot(2,2,move); imagesc(img1+img2); drawnow
+    title(['overlap ' num2str(overlap.tp) '% mJ=' num2str(overlap.mJ)])
+    index1 = index1+1;
+    index2 = index2 -1;
+end
+end
