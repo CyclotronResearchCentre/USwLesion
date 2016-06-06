@@ -137,23 +137,27 @@ if ~isempty(mask) % load if not empty
 end
 
 %%
-% *Compute the overlap using images as binary vectors*
+% *Compute the overlap using images as binary images & vectors*
+
+img1 = img1 > opt.thr; % \_ binarize
+img2 = img2 > opt.thr; % /
 
 if ~isempty(mask)
-    % remove inverted mask region
-    img1 = img1(:); img1(mask(:)) = [];
-    img2 = img2(:); img2(mask(:)) = [];
-    img1 = img1 > opt.thr;
-    img2 = img2 > opt.thr;
+    % apply mask and vectorize
+    img1(~mask(:)) = 0;
+    img2(~mask(:)) = 0;
+    vimg1 = img1(:); vimg1(mask(:)) = [];
+    vimg2 = img2(:); vimg2(mask(:)) = [];
 else
-    img1 = img1(:) > opt.thr;
-    img2 = img2(:) > opt.thr;
+    % vectorize
+    vimg1 = img1(:);
+    vimg2 = img2(:);
 end
 
 %%
 % *Compute Jaccard coefficient
-I = sum((img1+img2)==2);
-overlap.mJ = I / (sum(img1)+sum(img2)-I);
+I = sum((vimg1+vimg2)==2);
+overlap.mJ = I / (sum(vimg1)+sum(vimg2)-I);
 
 %%
 % *Compute percentage of overalp*
@@ -161,36 +165,36 @@ overlap.mJ = I / (sum(img1)+sum(img2)-I);
 % Get confusion matrix with same convention as in 
 %   <https://en.wikipedia.org/wiki/Confusion_matrix>
 % that is [ TP FN ; FP TN ]
-cm1 = [ sum(ismember(find(img1),find(img2))) ...
-       sum(ismember(find(img1==0),find(img2))) ; ...
-       sum(ismember(find(img1),find(img2==0))) ...
-       sum(ismember(find(img1==0),find(img2==0))) ];
-
-TP = sum(~~(img1+img2));
-FN = sum(~~(~img1+img2));
-FP = sum(~~(img1+~img2));
-TN = sum(~~(~img1+~img2));
+% cm = [ sum(ismember(find(vimg1),find(vimg2))) ...
+%        sum(ismember(find(vimg1==0),find(vimg2))) ; ...
+%        sum(ismember(find(vimg1),find(vimg2==0))) ...
+%        sum(ismember(find(vimg1==0),find(vimg2==0))) ];
+% The following CM calculation is about 10x faster than the previous one.
+TP = sum((vimg1+vimg2)==2);
+FN = sum((~vimg1+vimg2)==2);
+FP = sum((vimg1+~vimg2)==2);
+TN = sum((~vimg1+~vimg2)==2);
 overlap.cm = [ TP FN ; FP TN ];
 
 % Cohen's Kappa
-Po = (TP+TN)/sum(cm(:));
-Pr = (TP+TN)*(TP+FP)/sum(cm(:))^2;
+Po = (TP+TN)/sum(overlap.cm(:));
+Pr = (TP+TN)*(TP+FP)/sum(overlap.cm(:))^2;
 overlap.CK = (Po - Pr)/(1 - Pr);
 
-% percentage of img1 roi inside img2 roi
-tp = TP / sum(img2);
+% percentage of vimg1 roi inside vimg2 roi
+tp = TP / sum(vimg2);
 overlap.tp = tp*100;
 
-% percentage of img1 0 inside img2 0
-tn = TN / sum(img2==0);
+% percentage of vimg1 0 inside vimg2 0
+tn = TN / sum(vimg2==0);
 overlap.tn = tn*100;
 
-% percentage of img1 roi inside img2 0
-fp = FP / sum(img2==0);
+% percentage of vimg1 roi inside vimg2 0
+fp = FP / sum(vimg2==0);
 overlap.fp = fp*100;
 
-% percentage of img1 0 inside img2 roi
-fn = FN / sum(img2);
+% percentage of vimg1 0 inside vimg2 roi
+fn = FN / sum(vimg2);
 overlap.fn = fn *100;
 
 % Matthews correlation coefficient
