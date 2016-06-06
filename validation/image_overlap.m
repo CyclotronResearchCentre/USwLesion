@@ -14,13 +14,18 @@ function overlap = image_overlap(img1,img2,opt)
 %     (ground truth) image to computes overlap of source to the reference
 %   - opt is a structure with a few processing options
 %       .thr is the threshold applied to both images to binarize them,
-%            otherwise any non-zero value is considered as 1. By default
-%            thr=0, i.e. no thresholding is performed.
+%            otherwise any non-zero value is considered as 1.
+%            By default, thr=0, i.e. no thresholding is performed.
 %       .mask is a binary image indicating which pixels/voxels
-%            have to be taken into account (name or matrix)
+%            have to be taken into account (name or matrix).
+%            By default, no masking, i.e. [].
+%       .v2r voxel-to-realworld coordinates transformation, for the case
+%            where 3D arrays are passed directly.
+%            By default, anisotropic of size 1mm3, i.e. eye(4).
 %
 % OUTPUT:
 %   - overlap is a structure with the followign measures
+%       .mJ:    the modified Jaccard index (see Ref here under)
 %       .cm     confusion matrix [ TP FN ; FP TN ] counts
 %       .tp:    percentage of img1 roi inside img2 roi this is the true
 %               positive rate (sensitivity)
@@ -32,7 +37,7 @@ function overlap = image_overlap(img1,img2,opt)
 %               negative rate (specificity)
 %       .mcc:   Matthews correlation coefficient  (see Ref here under)
 %       .CK:    Cohen's Kappa
-%       .mJ:    the modified Jaccard index (see Ref here under)
+%       .mHd:   mean Hausdorff distance between the 2 surfaces.
 %
 %
 % REFERENCES:
@@ -49,6 +54,12 @@ function overlap = image_overlap(img1,img2,opt)
 %
 % Cohen's Kappa is described here:
 %   <https://en.wikipedia.org/wiki/Cohen's_kappa>
+%
+% Haussdorf distance:
+%   <https://en.wikipedia.org/wiki/Hausdorff_measure>
+% Here use a modified form where the mean distance between the surfaces is
+% calculated, instead of taking the maximum, i.e. the "average symmetric
+% surface distance" as in the MS lesion segmentation challenge
 % 
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 % NOTES:
@@ -79,20 +90,25 @@ end
 
 %%
 % Default values
-opt_def = struct('thr',0,'mask',[]);
+opt_def = struct('thr',0,'mask',[],'v2r',eye(4));
 opt = crc_check_flag(opt_def,opt);
 
 %%
 % Check fisrt images in: they need to be of the same size and to have 0s
+% vox-to-real world mapping is extracted from the 1st image, or set to the
+% value in 'opt', possibly the default value eye(4)
 
 % check format
 if ischar(img1)
     if exist(img1,'file')
         V1 = spm_vol(img1);
         img1 =spm_read_vols(V1);
+        v2r = V1.mat;
     else
         error('the file %s doesn''t exist',spm_file(img1,'filename'))
     end
+else
+    v2r = opt.v2r;
 end
 
 if ischar(img2)
@@ -137,7 +153,7 @@ if ~isempty(mask) % load if not empty
 end
 
 %%
-% *Compute the overlap using images as binary images & vectors*
+% *Apply the mask and consider images as binary images & vectors*
 
 img1 = img1 > opt.thr; % \_ binarize
 img2 = img2 > opt.thr; % /
@@ -176,11 +192,6 @@ FP = sum((vimg1+~vimg2)==2);
 TN = sum((~vimg1+~vimg2)==2);
 overlap.cm = [ TP FN ; FP TN ];
 
-% Cohen's Kappa
-Po = (TP+TN)/sum(overlap.cm(:));
-Pr = (TP+TN)*(TP+FP)/sum(overlap.cm(:))^2;
-overlap.CK = (Po - Pr)/(1 - Pr);
-
 % percentage of vimg1 roi inside vimg2 roi
 tp = TP / sum(vimg2);
 overlap.tp = tp*100;
@@ -199,6 +210,23 @@ overlap.fn = fn *100;
 
 % Matthews correlation coefficient
 overlap.mcc = ((TP*TN)-(FP*FN))/sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN));
+
+% Cohen's Kappa
+Po = (TP+TN)/sum(overlap.cm(:));
+Pr = (TP+TN)*(TP+FP)/sum(overlap.cm(:))^2;
+overlap.CK = (Po - Pr)/(1 - Pr);
+
+%% Extract the mean Hausdorff distance
+% Get border coordinates in vx
+[iBx1,iBy1,iBz1] = crc_borderVx(img1);
+[iBx2,iBy2,iBz2] = crc_borderVx(img2);
+
+% Get coordinates in mm
+Bxyz1_mm = v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
+Bxyz2_mm = v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
+
+[mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm); %#ok<*ASGLU>
+overlap.mHd = mean(mD);
 
 end
 
