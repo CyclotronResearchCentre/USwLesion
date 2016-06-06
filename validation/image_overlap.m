@@ -21,16 +21,18 @@ function overlap = image_overlap(img1,img2,opt)
 %
 % OUTPUT:
 %   - overlap is a structure with the followign measures
+%       .cm     confusion matrix [ TP FN ; FP TN ] counts
 %       .tp:    percentage of img1 roi inside img2 roi this is the true
 %               positive rate (sensitivity)
-%       .fp: percentage of img1 roi inside img2 0 this is the false
+%       .fp:    percentage of img1 roi inside img2 0 this is the false
 %               positive rate
-%       .tn: percentage of img1 0 inside img2 0 this is the true negative
+%       .tn:    percentage of img1 0 inside img2 0 this is the true negative
 %               rate
-%       .fn: percentage of img1 0 inside img2 roi this is the false
+%       .fn:    percentage of img1 0 inside img2 roi this is the false
 %               negative rate (specificity)
-%       .mcc: Matthews correlation coefficient  (see Ref here under)
-%       .mJ: the modified Jaccard index (see Ref here under)
+%       .mcc:   Matthews correlation coefficient  (see Ref here under)
+%       .CK:    Cohen's Kappa
+%       .mJ:    the modified Jaccard index (see Ref here under)
 %
 %
 % REFERENCES:
@@ -45,6 +47,9 @@ function overlap = image_overlap(img1,img2,opt)
 % The Matthews correlation coefficient is described here
 %   <https://en.wikipedia.org/wiki/Matthews_correlation_coefficient>
 %
+% Cohen's Kappa is described here:
+%   <https://en.wikipedia.org/wiki/Cohen's_kappa>
+% 
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 % NOTES:
 % To execute this function using MRI images, the software SPM needs to be
@@ -145,30 +150,51 @@ else
     img2 = img2(:) > opt.thr;
 end
 
+%%
+% *Compute Jaccard coefficient
 I = sum((img1+img2)==2);
 overlap.mJ = I / (sum(img1)+sum(img2)-I);
 
 %%
 % *Compute percentage of overalp*
 
+% Get confusion matrix with same convention as in 
+%   <https://en.wikipedia.org/wiki/Confusion_matrix>
+% that is [ TP FN ; FP TN ]
+cm1 = [ sum(ismember(find(img1),find(img2))) ...
+       sum(ismember(find(img1==0),find(img2))) ; ...
+       sum(ismember(find(img1),find(img2==0))) ...
+       sum(ismember(find(img1==0),find(img2==0))) ];
+
+TP = sum(~~(img1+img2));
+FN = sum(~~(~img1+img2));
+FP = sum(~~(img1+~img2));
+TN = sum(~~(~img1+~img2));
+overlap.cm = [ TP FN ; FP TN ];
+
+% Cohen's Kappa
+Po = (TP+TN)/sum(cm(:));
+Pr = (TP+TN)*(TP+FP)/sum(cm(:))^2;
+overlap.CK = (Po - Pr)/(1 - Pr);
+
 % percentage of img1 roi inside img2 roi
-tp = sum(ismember(find(img1),find(img2))) / sum(img2);
+tp = TP / sum(img2);
 overlap.tp = tp*100;
 
 % percentage of img1 0 inside img2 0
-tn = sum(ismember(find(img1==0),find(img2==0))) / sum(img2==0);
+tn = TN / sum(img2==0);
 overlap.tn = tn*100;
 
 % percentage of img1 roi inside img2 0
-fp = sum(ismember(find(img1),find(img2==0))) / sum(img2==0);
+fp = FP / sum(img2==0);
 overlap.fp = fp*100;
 
 % percentage of img1 0 inside img2 roi
-fn = sum(ismember(find(img1==0),find(img2))) / sum(img2);
+fn = FN / sum(img2);
 overlap.fn = fn *100;
 
 % Matthews correlation coefficient
-overlap.mcc = ((tp*tn)-(fp*fn))/sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn));
+overlap.mcc = ((TP*TN)-(FP*FN))/sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN));
 
 end
 
