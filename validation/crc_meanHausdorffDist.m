@@ -17,7 +17,7 @@ function [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2)
 % Copyright (C) 2016 Cyclotron Research Centre
 
 % Written by Christophe Phillips
-% University of Liège, Belgium
+% University of Liege, Belgium
 
 % Switch to true to get some stats and plots generated.
 fl_disp = false;
@@ -27,6 +27,8 @@ SZ1 = size(xyz1);
 if SZ1(1)<SZ1(2)
     xyz1 = xyz1' ; xyz2 = xyz2';
     SZ1 = size(xyz1); SZ2 = size(xyz2);
+else
+    SZ2 = size(xyz2); % ??
 end
 
 % Initialize the 2 distance vectors
