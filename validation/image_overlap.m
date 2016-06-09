@@ -89,20 +89,20 @@ function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
 
 %%
 % *Check input data*
+opt_def = struct('thr',0,'mask',[],'v2r',eye(4)); % default options
 
 if nargin == 0
     display_help_and_example % Simple example with synthetic images
     return
     
 elseif nargin == 2
-    % Define the default values for options and fill in opt structure
-    opt_def = struct('thr',0,'mask',[],'v2r',eye(4));
-    opt = crc_check_flag(opt_def,opt);
+    opt = []; % Go with the defaults
     
 elseif nargin < 2 || nargin > 3
     error('Two or three inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,option)')
 end
-
+% Fill the opt structure with defaults
+opt = crc_check_flag(opt_def,opt);
 
 %%
 % * Check fisrt images in*
@@ -120,11 +120,7 @@ if ischar(img1)
         error('the file %s doesn''t exist',spm_file(img1,'filename'))
     end
 else
-    try
-        v2r = opt.v2r;
-    catch
-        v2r = eye(4);
-    end
+    v2r = opt.v2r; % Use passed v2r or default one
 end
 
 if ischar(img2)
@@ -194,7 +190,7 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 %%
 % *Extract the mean Hausdorff distance*
 
-% Get border coordinates in vx
+% Get border coordinates in vx, not considering the mask!
 [iBx1,iBy1,iBz1] = crc_borderVx(img1);
 [iBx2,iBy2,iBz2] = crc_borderVx(img2);
 
@@ -218,12 +214,14 @@ if nargout == 3
         [L1,num1] = spm_bwlabel(double(img1),26);
         
         % for each cluster in img2 check if img1 has one too
+        NP = zeros(num2,1);
         for n=1:num2
             NP(n) = length(intersect(find(L1==n),find(L2==n)));
         end
         overlap.cluster.tp = sum(find(NP)) / length(NP);
         
         % for each cluster in img1 check if img2 has one too
+        NN = zeros(num1,1);
         for n=1:num1
             NN(n) = length(intersect(find(L1==n),find(L2==n)));
         end
@@ -236,14 +234,6 @@ if nargout == 3
     
     %%
     % *Compute percentage of overalp at the voxel level*
-    
-    % The following CM calculation is about 10x faster than the previous one.
-    % cm = [ sum(ismember(find(vimg1),find(vimg2))) ...
-    %        sum(ismember(find(vimg1==0),find(vimg2))) ; ...
-    %        sum(ismember(find(vimg1),find(vimg2==0))) ...
-    %        sum(ismember(find(vimg1==0),find(vimg2==0))) ];
-    
-    
     TP = sum((vimg1+vimg2)==2);
     FN = sum((~vimg1+vimg2)==2);
     FP = sum((vimg1+~vimg2)==2);
