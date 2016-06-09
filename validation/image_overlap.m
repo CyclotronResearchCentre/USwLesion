@@ -183,7 +183,7 @@ if ~isempty(mask)
     vimg2(mask(:)) = [];
 end
 
-%% Similarity measaures
+%% Similarity measures
 % ---------------------
 
 %%
@@ -219,15 +219,16 @@ if nargout == 3
         
         % for each cluster in img2 check if img1 has one too
         for n=1:num2
-            NP(n) = length(intersect(find(L1==n),find(L2==n)));
+            NP(n) = length(intersect(find(img1),find(L2==n)));
+            % divide by length(find(L2==n)) to get percentage per cluster;
         end
-        overlap.cluster.tp = sum(find(NP)) / length(NP);
+        overlap.cluster.tp = length(find(NP)) / num2;
         
         % for each cluster in img1 check if img2 has one too
         for n=1:num1
-            NN(n) = length(intersect(find(L1==n),find(L2==n)));
+            NN(n) = length(intersect(find(L1==n),find(img2)));
         end
-        overlap.cluster.fp = (length(NN)-sum(find(NN))) / length(NN);
+        overlap.cluster.fp = sum(NN==0) / num1;
     else
         overlap.cluster.tp = [];
         overlap.cluster.fp = [];
