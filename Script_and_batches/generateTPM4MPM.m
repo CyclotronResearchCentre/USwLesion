@@ -32,12 +32,21 @@ dr_TPM = fullfile(spm('dir'),'tpm');
 dr_SB = fullfile(spm('dir'),'toolbox','USwLesion','Script_and_batches');
 
 %% GET TPMs
-fn_TPMs = spm_select('ExtFPList',dr_TPM,fn_TPM,1:10)
-nTPMs = size(fn_TPMs,1)
-Vtpm = spm_vol(fn_TPMs)
+fn_TPMs = spm_select('ExtFPList',dr_TPM,fn_TPM,1:10);
+nTPMs = size(fn_TPMs,1);
+Vtpm = spm_vol(fn_TPMs);
 
 val_tpm = spm_read_vols(Vtpm);
-SZ = size(val_tpm)
+SZ = size(val_tpm);
+
+%% Some checks
+vv = reshape(val_tpm,[prod(SZ(1:3)) SZ(4)])';
+sc_tpm = sum(vv);
+vv = vv./(ones(SZ(4),1)*sc_tpm);
+val_tpm = reshape(vv',SZ);
+
+% fplot(sum(vv))
+% sum(sum(vv)>1)
 
 %% EXTRACT Pallidum from atlas, binarized and smoothed (4mm FWHM)
 
@@ -62,15 +71,15 @@ matlabbatch{2}.spm.spatial.smooth.im = 0;
 matlabbatch{2}.spm.spatial.smooth.prefix = 's';
 spm_jobman('run', matlabbatch);
 
+% load pallidum tpm
 fn_pallidum = ['s',fn_pallidum];
-
-Vpal = spm_vol(fullfile(dr_SB,fn_pallidum))
+Vpal = spm_vol(fullfile(dr_SB,fn_pallidum));
 val_pal = spm_read_vols(Vpal);
 
-% Update TPM by introducing a new tpm between GM and WM
+%% Update TPM by introducing a new tpm between GM and WM
 min_tpm = crc_USwL_get_defaults('uTPM.min_tpm');
 min_tpm_icv = crc_USwL_get_defaults('uTPM.min_tpm_icv');
-vval_tpm = reshape(val_tpm,prod(SZ(1:3)),SZ(4)) - min_tpm;
+vval_tpm = reshape(val_tpm , [prod(SZ(1:3)) SZ(4)]) - min_tpm;
 vval_utpm = zeros(prod(SZ(1:3)),SZ(4)+1);
 
 vval_utpm(:,2) = vval_tpm(:,1).*val_pal(:) - min_tpm_icv; % Pallidum

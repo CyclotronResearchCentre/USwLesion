@@ -110,8 +110,8 @@ end
 %% 4. Update the TPMs to include a 7th tissue class -> TPMms
 % Note that the lesion is inserted in *3rd position*, between WM and CSF!
 opt_tpm = struct(...
-    'tpm4lesion', job.options.tpm4lesion, ...
-    'fn_tpm', job.options.imgTpm, ...
+    'tpm4lesion', job.options.tpm4lesion, ... %     'fn_tpm', job.options.imgTpm, ...
+    'fn_tpm', crc_USwL_get_defaults('segment.imgTpm4MPM'), ...
     'tpm_ratio', opt.tpm_ratio, ...
     'min_tpm_icv', opt.min_tpm_icv, ...
     'min_tpm', opt.min_tpm);
@@ -155,10 +155,12 @@ switch job.options.img4US
         end
 end
 
+NbGaussian = [3 2 2 2 2 1 1 1];
+
 opt_segm = struct( ...
     'b_param', [job.options.biasreg job.options.biasfwhm], ...
     'b_write', job.options.biaswr, ...
-    'nGauss', job.options.NbGaussian, ...
+    'nGauss', NbGaussian, ...; % job.options.NbGaussian, ...
     'mrf', job.options.mrf, ...
     'cleanup', job.options.cleanup); 
 
@@ -489,12 +491,30 @@ function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 
 % 0) select TPM and load
 [pth,fnam,ext,num] = spm_fileparts(opt.fn_tpm);
-fn_TPM = fullfile(pth,[fnam,ext]); % ensuring I load all 6 TPMs together.
+fn_TPM = fullfile(pth,[fnam,ext]); % ensuring I load all TPMs together.
 Vtpm     = spm_vol(fn_TPM);
 tpm_orig = spm_read_vols(Vtpm);
-tpm_GM   = squeeze(tpm_orig(:,:,:,1));
-tpm_WM   = squeeze(tpm_orig(:,:,:,2)); % used later on to define ICV
-tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
+Ntpm_o = numel(Vtpm);
+if Ntpm_o==6
+    % Standard TPM
+    tpm_std = true;
+elseif Ntpm_o==7
+    % Special TPM for MPM (with pallidum)
+    tpm_std = false;
+else
+    error('Wrong number of TPM''s.');
+end
+if tpm_std
+    tpm_GM   = squeeze(tpm_orig(:,:,:,1));
+    tpm_WM   = squeeze(tpm_orig(:,:,:,2)); % used later on to define ICV
+    tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
+else
+    tpm_GM   = squeeze(sum(tpm_orig(:,:,:,1:2),4));
+    alpha    = squeeze(tpm_orig(:,:,:,1)./tpm_orig(:,:,:,2));
+    tpm_WM   = squeeze(tpm_orig(:,:,:,3)); % used later on to define ICV
+    tpm_CSF  = squeeze(tpm_orig(:,:,:,4));
+end
+
 switch opt.tpm4lesion % Read in the healthy tissue prob map.
     case 0 % GM only
         tpm_healthy = tpm_GM;
@@ -515,42 +535,83 @@ tpm_l = spm_read_vols(Vl);
 % 3) concatenate by setting lesion at #7 & adjust 'other' class
 tpm_Lu = (1-1/opt.tpm_ratio)*tpm_l.*tpm_healthy; % update lesion tpm
 tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV, ICV defined based on WM > min_tpm_icv
-tpm_ext = cat(4,tpm_orig,tpm_Lu);
+tpm_ext = cat(4,tpm_orig,tpm_Lu); % put lesion at the end
+
 switch opt.tpm4lesion % update healthy tissues
     case 0 % GM only
         tpm_GMu = tpm_healthy - tpm_Lu;
         % equiv. to tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
-        tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
-        tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
-        tpm_ext(:,:,:,1) = tpm_GMu; % update GM
+        if tpm_std
+            tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
+            tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_ext(:,:,:,1) = tpm_GMu; % update GM
+        else
+            tpm_Gu = tpm_GMu./(1+alpha);
+            tpm_Pu = tpm_GMu - tpm_Gu;
+            tpm_Gu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
+            tpm_Gu(tpm_WM>=opt.min_tpm_icv & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
+            tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_ext(:,:,:,1) = tpm_Gu; % update GM
+            tpm_ext(:,:,:,2) = tpm_Pu; % update pallidum
+        end
     case 1 % WM only
         tpm_WMu = tpm_healthy - tpm_Lu;
         % equiv. to tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
         tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
-        tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+        if tpm_std
+            tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+        else
+            tpm_ext(:,:,:,3) = tpm_WMu; % update WM
+        end
     case 2 % WM+GM
         tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
         tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
         tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
-        tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
-        tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
-        tpm_ext(:,:,:,1) = tpm_GMu; % update GM
-        tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+        if tpm_std
+            tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
+            tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_ext(:,:,:,1) = tpm_GMu; % update GM
+            tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+        else
+            tpm_Gu = tpm_GMu./(1+alpha);
+            tpm_Pu = tpm_GMu - tpm_Gu;
+            tpm_Gu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
+            tpm_Gu(tpm_WM>=opt.min_tpm_icv & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
+            tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_ext(:,:,:,1) = tpm_Gu; % update GM
+            tpm_ext(:,:,:,2) = tpm_Pu; % update pallidum
+            tpm_ext(:,:,:,3) = tpm_WMu; % update WM
+        end
     case 3 % WM+GM+CSF
         tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
         tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
-        tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
-        tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
-        tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
         tpm_CSFu = tpm_CSF .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_CSFu(tpm_CSFu<opt.min_tpm) = opt.min_tpm;
         tpm_CSFu(tpm_WM>=opt.min_tpm_icv & tpm_CSFu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
-        tpm_ext(:,:,:,1) = tpm_GMu; % update GM
-        tpm_ext(:,:,:,2) = tpm_WMu; % update WM
-        tpm_ext(:,:,:,3) = tpm_CSFu; % update CSF
+        tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
+        if tpm_std
+            tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
+            tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_ext(:,:,:,1) = tpm_GMu; % update GM
+            tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+            tpm_ext(:,:,:,3) = tpm_CSFu; % update CSF
+        else
+            tpm_Gu = tpm_GMu./(1+alpha);
+            tpm_Pu = tpm_GMu - tpm_Gu;
+            tpm_Gu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
+            tpm_Gu(tpm_WM>=opt.min_tpm_icv & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
+            tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_ext(:,:,:,1) = tpm_Gu; % update GM
+            tpm_ext(:,:,:,2) = tpm_Pu; % update pallidum
+            tpm_ext(:,:,:,3) = tpm_WMu; % update WM
+            tpm_ext(:,:,:,4) = tpm_CSFu; % update CSF
+       end
     otherwise
         error('Wrong tissue flag');
 end
@@ -559,26 +620,37 @@ end
 if isfield(opt,'fn_swICV');
     V_swICV = spm_vol(opt.fn_swICV);
     swICV = spm_read_vols(V_swICV);
-    for ii = [1:5 7]
+    ltpm = [1:Ntpm_o-1 Ntpm_o+1];
+%     if tpm_std
+%         ltpm = [1:5 7];
+%     else
+%         ltpm = [1:6 8];
+%     end
+    for ii = ltpm
         tmp = tpm_ext(:,:,:,ii).*swICV;
         tmp(tmp<opt.min_tpm) = opt.min_tpm;
         tpm_ext(:,:,:,ii) = tmp;
     end
 end
 
- % Update 'other', which is in 6th position
-tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,[1:5 7]),4);
+ % Update 'other', which is in last position of original tpm
+tpm_ext(:,:,:,Ntpm_o) = 1 - sum(tpm_ext(:,:,:,[1:Ntpm_o-1 Ntpm_o+1]),4);
 
-% 4) save the TPMl, with lesion in #3, in subject's data directory.
+% 4) save the TPMl, with lesion between WM & CSF, in subject's data dir.
 fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'), ...
     spm_file(spm_file(fn_TPM,'filename'),'suffix','_les'));
 Vtpm_l = Vtpm;
-Vtpm_l(7) = Vtpm(6);
+% adding 1 tpm
+Vtpm_l(Ntpm_o+1) = Vtpm(Ntpm_o);
 mem_sz = Vtpm(2).pinfo(3)-Vtpm(1).pinfo(3);
-Vtpm_l(7).pinfo(3) = Vtpm_l(7).pinfo(3) + mem_sz;
-Vtpm_l(7).n(1) = 7;
-tc_order = [1 2 7 3 4 5 6]; % the lesion class is inserted in 3rd position!
-for ii=1:7
+Vtpm_l(Ntpm_o+1).pinfo(3) = Vtpm_l(Ntpm_o+1).pinfo(3) + mem_sz;
+Vtpm_l(Ntpm_o+1).n(1) = Ntpm_o+1;
+if tpm_std
+    tc_order = [1 2 7 3 4 5 6]; % the lesion class is inserted in 3rd position!
+else
+    tc_order = [1 2 3 8 4 5 6 7]; % the lesion class is inserted in 3rd position!
+end
+for ii=1:Ntpm_o+1
     Vtpm_l(ii).fname = fn_TPMl;
     Vtpm_l(ii) = spm_create_vol(Vtpm_l(ii));
     Vtpm_l(ii) = spm_write_vol(Vtpm_l(ii),tpm_ext(:,:,:,tc_order(ii)));
@@ -605,6 +677,7 @@ function [matlabbatch] = batch_segment_l(P,Ptpm_l,opt)
 
 % Multiple channels?
 nP = size(P,1);
+nG = numel(opt.nGauss);
 
 % if nargin<3
 %     opt = struct(...
@@ -640,9 +713,14 @@ if nP>1
         matlabbatch{1}.spm.spatial.preproc.channel(ii).write = b_write(ii,:);
     end
 end
-% Define 7 TPM's
-cr_native = [1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ];
-cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ];
+% Define TPM's
+if nG==7
+    cr_native = [1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ];
+    cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ];
+else
+    cr_native = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ];
+    cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ];
+end
 for ii = 1:7
     matlabbatch{1}.spm.spatial.preproc.tissue(ii).tpm = {[Ptpm_l,',',num2str(ii)]};
     matlabbatch{1}.spm.spatial.preproc.tissue(ii).ngaus = opt.nGauss(ii);
