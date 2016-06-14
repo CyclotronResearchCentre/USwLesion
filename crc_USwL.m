@@ -38,6 +38,15 @@ else
     nMPM = size(fn_in{3},1);
 end
 
+% Check #Gaussians and #TPMs for the USwLesion segmentation.
+NbGaussian = job.options.NbGaussian;
+fn_tpm_USwL = job.options.imgTpm;
+Vtpm_USwL = spm_vol(fn_tpm_USwL{1});
+if numel(NbGaussian)~=(numel(Vtpm_USwL)+1)
+    error('There are %d tpm (incl. lesion) but only %d #Gaussians provided', ...
+        numel(Vtpm_USwL)+1,numel(NbGaussian));
+end
+
 %% Define processing parameters for the creation of the updated TPM
 opt = crc_USwL_get_defaults('uTPM');
 
@@ -86,8 +95,14 @@ pth = spm_file(fn_in{2},'path');
 %% 3. Segment the masked structural (k_sRef), normalize the cleaned up mask
 % (t_Msk) and smooth it -> new TPM for the lesion.
 % Then create an ICV mask for MPM's ICV masking
+% Here use the default TPMs, as this is a reference structural image
 clear matlabbatch
-[matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kMTw,fn_tMsk,job.options.imgTpm{1},opt.smoKern);
+fn_tpm_msksegm = crc_USwL_get_defaults('msksegm.imgTpm');
+[matlabbatch,fn_ICV] = batch_normalize_smooth( ...
+    fn_kMTw, ... % masked structural image used for the warping estimation
+    fn_tMsk, ... % cleaned up lesion mask to be warped into MNI
+    fn_tpm_msksegm{1}, ... % filename of tissue probability map
+    opt.smoKern); % smoothing applied on the normalized lesion mask -> new prior
 spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
@@ -107,16 +122,16 @@ if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs
     fn_swICV = spm_file(fn_ICV,'prefix','sw');
 end
 
-%% 4. Update the TPMs to include a 7th tissue class -> TPMms
+%% 4. Update the TPMs to include an extra tissue class -> TPMms
 % Note that the lesion is inserted in *3rd position*, between WM and CSF!
 opt_tpm = struct(...
-    'tpm4lesion', job.options.tpm4lesion, ... %     'fn_tpm', job.options.imgTpm, ...
-    'fn_tpm', crc_USwL_get_defaults('segment.imgTpm4MPM'), ...
-    'tpm_ratio', opt.tpm_ratio, ...
-    'min_tpm_icv', opt.min_tpm_icv, ...
-    'min_tpm', opt.min_tpm);
+    'tpm4lesion', job.options.tpm4lesion, ... % tissues to be modified for lesion (0/1/2/3) for GM / WM / GM+WM / GM+WM+CSF
+    'fn_tpm', fn_tpm_USwL{1}, ... % tpm file name
+    'tpm_ratio', opt.tpm_ratio, ... % ratio between healthy and lesion tissue
+    'min_tpm_icv', opt.min_tpm_icv, ... % minimum value in intracranial volume
+    'min_tpm', opt.min_tpm); % minum value overall
 if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the TPMs
-    opt_tpm.fn_swICV = fn_swICV;
+    opt_tpm.fn_swICV = fn_swICV; % smoothed-warped ICV mask to apply on TPMs
 end
 fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk); % that creates the new tissue class tmp
 
@@ -151,22 +166,34 @@ switch job.options.img4US
                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
             end
         else
-            fn_Img2segm = char(fn_in{3} ,fn_in{2},  fn_in{4}); % % else as requested use MPM, and all others
+            fn_Img2segm = char(fn_in{3} ,fn_in{2},  fn_in{4}); % else as requested use MPM, and all others
         end
 end
-
-NbGaussian = [3 2 2 2 2 1 1 1];
 
 opt_segm = struct( ...
     'b_param', [job.options.biasreg job.options.biasfwhm], ...
     'b_write', job.options.biaswr, ...
-    'nGauss', NbGaussian, ...; % job.options.NbGaussian, ...
+    'nGauss', NbGaussian, ...
     'mrf', job.options.mrf, ...
     'cleanup', job.options.cleanup); 
 
 clear matlabbatch
 [matlabbatch] = batch_segment_l(fn_Img2segm, fn_TPMl, opt_segm);
 spm_jobman('run', matlabbatch);
+
+fn_Cimg   = spm_select('FPList',pth,'^c[0-9].*\.nii$');   % native space
+fn_rCimg  = spm_select('FPList',pth,'^rc[0-9].*\.nii$');  % native dartel imported
+fn_wCimg  = spm_select('FPList',pth,'^wc[0-9].*\.nii$');  % warped
+fn_mwCimg = spm_select('FPList',pth,'^mwc[0-9].*\.nii$'); % modulated warped
+
+% When using pallidum, i.e. extended TPM, then recombine GM with pallidum
+%  -> add c8 onto c1 -> only 1 image (c1) with GM + c8 with pallidum.
+if NbGaussian==8
+    add_2_images(fn_Cimg([1 end],:),  fn_Cimg(1,:), 2); % uint8
+    add_2_images(fn_rCimg([1 end],:), fn_rCimg(1,:), 16); % float32
+    add_2_images(fn_wCimg([1 end],:), fn_wCimg(1,:), 2); % uint8
+    add_2_images(fn_mwCimg([1 end],:),fn_mwCimg(1,:), 16); % float32
+end
 
 %% 6. Apply the deformation onto the MPMs -> warped MPMs
 
@@ -184,11 +211,10 @@ spm_jobman('run', matlabbatch);
 fn_warped_struct = spm_file(fn_in{2},'prefix','w');
 fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
 fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
-fn_mwTC = char( ...
-    spm_file(fn_in{3}(1,:),'prefix','smwc1'), ...
-    spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
-    spm_file(fn_in{3}(1,:),'prefix','smwc3') ); %#ok<*NASGU>
-
+% fn_mwTC = char( ...
+%     spm_file(fn_in{3}(1,:),'prefix','smwc1'), ...
+%     spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
+%     spm_file(fn_in{3}(1,:),'prefix','smwc3') ); %#ok<*NASGU>
 
 %% 7. Collect all the image filenames created
 if ~isempty(fn_warped_struct)
@@ -225,21 +251,21 @@ if ~isempty(fn_warped_Oth)
     end
 end
 
-tmp = spm_select('FPList',pth,'^c[0-9].*\.nii$'); % segmented tissues
-fn_out.segmImg.c1 = {deblank(tmp(1,:))}; % GM
-fn_out.segmImg.c2 = {deblank(tmp(2,:))}; % WM
-fn_out.segmImg.c3 = {deblank(tmp(3,:))}; % Lesion
-fn_out.segmImg.c4 = {deblank(tmp(4,:))}; % CSF
-tmp = spm_select('FPList',pth,'^wc[0-9].*\.nii$'); % segmented tissues
-fn_out.segmImg.wc1 = {deblank(tmp(1,:))}; % warped GM
-fn_out.segmImg.wc2 = {deblank(tmp(2,:))}; % warped WM
-fn_out.segmImg.wc3 = {deblank(tmp(3,:))}; % warped Lesion
-fn_out.segmImg.wc4 = {deblank(tmp(4,:))}; % warped CSF
-tmp = spm_select('FPList',pth,'^mwc[0-9].*\.nii$'); % segmented tissues
-fn_out.segmImg.mwc1 = {deblank(tmp(1,:))}; % modulated warped GM
-fn_out.segmImg.mwc2 = {deblank(tmp(2,:))}; % modulated warped WM
-fn_out.segmImg.mwc3 = {deblank(tmp(3,:))}; % modulated warped Lesion
-fn_out.segmImg.mwc4 = {deblank(tmp(4,:))}; % modulated warped CSF
+% segmented tissues
+fn_out.segmImg.c1 = {deblank(fn_Cimg(1,:))}; % GM
+fn_out.segmImg.c2 = {deblank(fn_Cimg(2,:))}; % WM
+fn_out.segmImg.c3 = {deblank(fn_Cimg(3,:))}; % Lesion
+fn_out.segmImg.c4 = {deblank(fn_Cimg(4,:))}; % CSF
+% warped segmented tissues
+fn_out.segmImg.wc1 = {deblank(fn_wCimg(1,:))}; % warped GM
+fn_out.segmImg.wc2 = {deblank(fn_wCimg(2,:))}; % warped WM
+fn_out.segmImg.wc3 = {deblank(fn_wCimg(3,:))}; % warped Lesion
+fn_out.segmImg.wc4 = {deblank(fn_wCimg(4,:))}; % warped CSF
+% modulated warped segmented tissues
+fn_out.segmImg.mwc1 = {deblank(fn_mwCimg(1,:))}; % modulated warped GM
+fn_out.segmImg.mwc2 = {deblank(fn_mwCimg(2,:))}; % modulated warped WM
+fn_out.segmImg.mwc3 = {deblank(fn_mwCimg(3,:))}; % modulated warped Lesion
+fn_out.segmImg.mwc4 = {deblank(fn_mwCimg(4,:))}; % modulated warped CSF
 fn_out.TPMl = {fn_TPMl};
 
 if job.options.thrLesion ~= 0
@@ -366,7 +392,7 @@ end
 %% STEP 3: Creating the normalization batch for the masked structural image
 function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
 % [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
-% This includes:
+% This batch includes:
 % [1,2] defining inputs
 % [3] segmentation of the masked structural
 % [4,5] writing out + smoothing the normalized lesion mask
@@ -472,7 +498,7 @@ fn_ICV = fullfile(pth_img,fn_ICV);
 
 end
 
-%% STEP 4: Updating the TPM with a 7th class, the lesion
+%% STEP 4: Updating the TPM with an extra class, the lesion
 % Note that the lesion is inserted in *3rd position*, between WM and CSF!
 function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 % fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
@@ -482,7 +508,7 @@ function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 %     .tpm4lesion : tissues to be modified for lesion (0/1/2/3) for
 %                       GM / WM / GM+WM / GM+WM+CSF
 %     .fn_tpm : tpm file name
-%     .tpm_ratio : ration between WM and lesion
+%     .tpm_ratio : ratio between healthy and lesion tissue
 %     .min_tpm_icv : minimum value in intracranial volume
 %     .min_tpm : minum value overall
 %     .fn_swICV : [optional] smoothed-warped ICV mask to apply on TPMs
@@ -509,10 +535,10 @@ if tpm_std
     tpm_WM   = squeeze(tpm_orig(:,:,:,2)); % used later on to define ICV
     tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
 else
-    tpm_GM   = squeeze(sum(tpm_orig(:,:,:,1:2),4));
-    alpha    = squeeze(tpm_orig(:,:,:,1)./tpm_orig(:,:,:,2));
-    tpm_WM   = squeeze(tpm_orig(:,:,:,3)); % used later on to define ICV
-    tpm_CSF  = squeeze(tpm_orig(:,:,:,4));
+    tpm_GM   = squeeze(sum(tpm_orig(:,:,:,[1 7]),4));
+    alpha    = squeeze(tpm_orig(:,:,:,1)./tpm_orig(:,:,:,7)); % ratio GM/pallidum
+    tpm_WM   = squeeze(tpm_orig(:,:,:,2)); % used later on to define ICV
+    tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
 end
 
 switch opt.tpm4lesion % Read in the healthy tissue prob map.
@@ -532,12 +558,12 @@ tpm_l = spm_read_vols(Vl);
 
 % 1) scale lesion tpm and adjust healthy tissue prob map in ICV
 % 2) ensure minium value all over
-% 3) concatenate by setting lesion at #7 & adjust 'other' class
+% 3) concatenate by setting lesion at last position & adjust 'other' class
 tpm_Lu = (1-1/opt.tpm_ratio)*tpm_l.*tpm_healthy; % update lesion tpm
 tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV, ICV defined based on WM > min_tpm_icv
 tpm_ext = cat(4,tpm_orig,tpm_Lu); % put lesion at the end
 
-switch opt.tpm4lesion % update healthy tissues
+switch opt.tpm4lesion % update healthy tissue classes
     case 0 % GM only
         tpm_GMu = tpm_healthy - tpm_Lu;
         % equiv. to tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
@@ -553,18 +579,14 @@ switch opt.tpm4lesion % update healthy tissues
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
             tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
-            tpm_ext(:,:,:,2) = tpm_Pu; % update pallidum
+            tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
         end
     case 1 % WM only
         tpm_WMu = tpm_healthy - tpm_Lu;
         % equiv. to tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
         tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
-        if tpm_std
-            tpm_ext(:,:,:,2) = tpm_WMu; % update WM
-        else
-            tpm_ext(:,:,:,3) = tpm_WMu; % update WM
-        end
+        tpm_ext(:,:,:,2) = tpm_WMu; % update WM
     case 2 % WM+GM
         tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
@@ -583,8 +605,8 @@ switch opt.tpm4lesion % update healthy tissues
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
             tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
-            tpm_ext(:,:,:,2) = tpm_Pu; % update pallidum
-            tpm_ext(:,:,:,3) = tpm_WMu; % update WM
+            tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
+            tpm_ext(:,:,:,2) = tpm_WMu; % update WM
         end
     case 3 % WM+GM+CSF
         tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
@@ -608,24 +630,21 @@ switch opt.tpm4lesion % update healthy tissues
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
             tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
-            tpm_ext(:,:,:,2) = tpm_Pu; % update pallidum
-            tpm_ext(:,:,:,3) = tpm_WMu; % update WM
-            tpm_ext(:,:,:,4) = tpm_CSFu; % update CSF
+            tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
+            tpm_ext(:,:,:,2) = tpm_WMu; % update WM
+            tpm_ext(:,:,:,3) = tpm_CSFu; % update CSF
        end
     otherwise
         error('Wrong tissue flag');
 end
 
+% list of tissue, without air
+ltpm = [1:5 7:Ntpm_o+1];
+
 % Mask out with swICV, if provided
 if isfield(opt,'fn_swICV');
     V_swICV = spm_vol(opt.fn_swICV);
     swICV = spm_read_vols(V_swICV);
-    ltpm = [1:Ntpm_o-1 Ntpm_o+1];
-%     if tpm_std
-%         ltpm = [1:5 7];
-%     else
-%         ltpm = [1:6 8];
-%     end
     for ii = ltpm
         tmp = tpm_ext(:,:,:,ii).*swICV;
         tmp(tmp<opt.min_tpm) = opt.min_tpm;
@@ -633,8 +652,8 @@ if isfield(opt,'fn_swICV');
     end
 end
 
- % Update 'other', which is in last position of original tpm
-tpm_ext(:,:,:,Ntpm_o) = 1 - sum(tpm_ext(:,:,:,[1:Ntpm_o-1 Ntpm_o+1]),4);
+ % Update 'other', which is in 6th position of original tpm
+tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,ltpm),4);
 
 % 4) save the TPMl, with lesion between WM & CSF, in subject's data dir.
 fn_TPMl = fullfile(spm_file(fn_swtMsk,'path'), ...
@@ -648,7 +667,7 @@ Vtpm_l(Ntpm_o+1).n(1) = Ntpm_o+1;
 if tpm_std
     tc_order = [1 2 7 3 4 5 6]; % the lesion class is inserted in 3rd position!
 else
-    tc_order = [1 2 3 8 4 5 6 7]; % the lesion class is inserted in 3rd position!
+    tc_order = [1 2 8 3 4 5 6 7]; % the lesion class is inserted in 3rd position!
 end
 for ii=1:Ntpm_o+1
     Vtpm_l(ii).fname = fn_TPMl;
@@ -658,7 +677,7 @@ end
 
 end
 
-%% STEP 5: Creating the segmentatin batch with 7 tissue clasess
+%% STEP 5: Creating the segmentatin batch with 7 (or 8) tissue clasess
 % + smoothing of modulated warped tissue classes
 function [matlabbatch] = batch_segment_l(P,Ptpm_l,opt)
 % [matlabbatch] = batch_segment_l(P,Ptpm,param)
@@ -675,16 +694,9 @@ function [matlabbatch] = batch_segment_l(P,Ptpm_l,opt)
 %   . mrf     : mrf parameter
 %   . cleanup : cleanup parameter
 
-% Multiple channels?
+% Multiple channels & number of tissue classes
 nP = size(P,1);
 nG = numel(opt.nGauss);
-
-% if nargin<3
-%     opt = struct(...
-%         'b_param',ones(nP,1)*[.00001 Inf],...
-%         'b_write',zeros(nP,2), ...% By default no bias
-%         'nGauss', [2 2 2 2 3 4 2]); 
-% end
 
 b_param = opt.b_param;
 b_write = opt.b_write;
@@ -717,11 +729,11 @@ end
 if nG==7
     cr_native = [1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ];
     cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ];
-else
-    cr_native = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ];
-    cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ];
+else % Using TPM with pallidum
+    cr_native = [1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ; 1 1 ];
+    cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ; 1 1 ];
 end
-for ii = 1:7
+for ii = 1:nG
     matlabbatch{1}.spm.spatial.preproc.tissue(ii).tpm = {[Ptpm_l,',',num2str(ii)]};
     matlabbatch{1}.spm.spatial.preproc.tissue(ii).ngaus = opt.nGauss(ii);
     matlabbatch{1}.spm.spatial.preproc.tissue(ii).native = cr_native(ii,:);
@@ -737,23 +749,27 @@ matlabbatch{1}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{1}.spm.spatial.preproc.warp.fwhm = 0;
 matlabbatch{1}.spm.spatial.preproc.warp.samp = 3;
 matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1];
-% Smoothing a bit
-matlabbatch{2}.spm.spatial.smooth.data(1) = ...
-    cfg_dep('Segment: mwc1 Images', substruct('.','val', '{}',{1}, ...
-    '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-    substruct('.','tiss', '()',{1}, '.','mwc', '()',{':'}));
-matlabbatch{2}.spm.spatial.smooth.data(2) = ...
-    cfg_dep('Segment: mwc2 Images', substruct('.','val', '{}',{1}, ...
-    '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-    substruct('.','tiss', '()',{2}, '.','mwc', '()',{':'}));
-matlabbatch{2}.spm.spatial.smooth.data(3) = ...
-    cfg_dep('Segment: mwc3 Images', substruct('.','val', '{}',{1}, ...
-    '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-    substruct('.','tiss', '()',{3}, '.','mwc', '()',{':'}));
-matlabbatch{2}.spm.spatial.smooth.fwhm = [2 2 2];
-matlabbatch{2}.spm.spatial.smooth.dtype = 0;
-matlabbatch{2}.spm.spatial.smooth.im = 0;
-matlabbatch{2}.spm.spatial.smooth.prefix = 's';
+% % Smoothing a bit
+% matlabbatch{2}.spm.spatial.smooth.data(1) = ...
+%     cfg_dep('Segment: mwc1 Images', substruct('.','val', '{}',{1}, ...
+%     '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+%     substruct('.','tiss', '()',{1}, '.','mwc', '()',{':'}));
+% matlabbatch{2}.spm.spatial.smooth.data(2) = ...
+%     cfg_dep('Segment: mwc2 Images', substruct('.','val', '{}',{1}, ...
+%     '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+%     substruct('.','tiss', '()',{2}, '.','mwc', '()',{':'}));
+% matlabbatch{2}.spm.spatial.smooth.data(3) = ...
+%     cfg_dep('Segment: mwc3 Images', substruct('.','val', '{}',{1}, ...
+%     '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+%     substruct('.','tiss', '()',{3}, '.','mwc', '()',{':'}));
+% matlabbatch{2}.spm.spatial.smooth.data(4) = ...
+%     cfg_dep('Segment: mwc8 Images', substruct('.','val', '{}',{1}, ...
+%     '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+%     substruct('.','tiss', '()',{8}, '.','mwc', '()',{':'}));
+% matlabbatch{2}.spm.spatial.smooth.fwhm = [2 2 2];
+% matlabbatch{2}.spm.spatial.smooth.dtype = 0;
+% matlabbatch{2}.spm.spatial.smooth.im = 0;
+% matlabbatch{2}.spm.spatial.smooth.prefix = 's';
 
 end
 
@@ -771,5 +787,16 @@ matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70
     78 76 85];
 matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = [1 1 1];
 matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 4;
+
+end
+
+%% ADDING 2 IMAGES TOGETHER
+function add_2_images(fn_in,fn_out,dtype)
+% Adding 2 images together
+% No checking whatsoever!
+Vi = spm_vol(fn_in);
+Vo = spm_vol(fn_out);
+fl.dtype = dtype;
+Vo = spm_imcalc(Vi, Vo, 'i1+i2' ,fl);
 
 end
