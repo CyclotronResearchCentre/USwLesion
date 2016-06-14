@@ -2,10 +2,10 @@
 %
 % WHY:
 % From some data check with several (elderly) subjects, the pallidum shows 
-% very different voxel intensities from those of the rest of the GM.
-% This is particularly visible in the A (much darker voxels) and R2s (much
-% brighter voxels) images. There is no obvious difference in the R1 neither
-% MT imges.
+% very different voxel intensities from those of the rest of the GM (due to
+% iron deposit with age). This is particularly visible in the A (much 
+% darker voxels) and R2s (much brighter voxels) images. There is no obvious
+% difference in the R1 neither MT imges.
 % This change in intensities is most probably linked to normal ageing as
 % observed in the Calaghan et al., 2014, paper. This seems to be the main
 % reason why segmentation is usually performed on a MT image as the
@@ -23,6 +23,17 @@
 % The only requirement is to update the TPM with a new prior tissue class 
 % (for the pallidum) and to update the other priors, moslty the GM one.
 % There is one atlas distributed with SPM12, let's use it!
+% In practic this messes up a bit the general flow of images as the GM is
+% now "split" into 2 different images. Moreover some part of code are
+% hard-coded with the first 3 segmented images to be GM-WM-CSF. One way out
+% of this is to include the pallidum class at the end (7th position), then
+% after the segmentation c1 (GM minus pallidum) and c7 (pallidum only) 
+% images can be added together to produce a c1 image with the full GM.
+% 
+% NOTE:
+% The same kind of problem occurs when a lesion class is introduced between
+% the WM and CSF, so it is important to check any SPM code dealing with
+% segmented tissue classes (e.g. cleaning!)
 
 %% DEFINE a few filenames
 fn_TPM = 'unwTPM_sl2.nii';
@@ -30,6 +41,7 @@ fn_atlas = 'labels_Neuromorphometrics.nii';
 fn_pallidum = 'b_pallidum.nii';
 dr_TPM = fullfile(spm('dir'),'tpm');
 dr_SB = fullfile(spm('dir'),'toolbox','USwLesion','Script_and_batches');
+mask_smoothing = 4; % smoothing (in mm of FWHM) for the pallidum mask
 
 %% GET TPMs
 fn_TPMs = spm_select('ExtFPList',dr_TPM,fn_TPM,1:10);
@@ -39,13 +51,13 @@ Vtpm = spm_vol(fn_TPMs);
 val_tpm = spm_read_vols(Vtpm);
 SZ = size(val_tpm);
 
-%% Some checks
+%% Some checks & scaling
 vv = reshape(val_tpm,[prod(SZ(1:3)) SZ(4)])';
 sc_tpm = sum(vv);
 vv = vv./(ones(SZ(4),1)*sc_tpm);
 val_tpm = reshape(vv',SZ);
 
-% fplot(sum(vv))
+% fplot(sum(vv)-1)
 % sum(sum(vv)>1)
 
 %% EXTRACT Pallidum from atlas, binarized and smoothed (4mm FWHM)
@@ -65,7 +77,7 @@ matlabbatch{2}.spm.spatial.smooth.data(1) = ...
     cfg_dep('Image Calculator: ImCalc Computed Image: b_pallidum.nii', ...
             substruct('.','val', '{}',{1}, '.','val', '{}',{1}, ...
                       '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{2}.spm.spatial.smooth.fwhm = [4 4 4];
+matlabbatch{2}.spm.spatial.smooth.fwhm = [1 1 1]*mask_smoothing;
 matlabbatch{2}.spm.spatial.smooth.dtype = 16;
 matlabbatch{2}.spm.spatial.smooth.im = 0;
 matlabbatch{2}.spm.spatial.smooth.prefix = 's';
@@ -79,16 +91,25 @@ val_pal = spm_read_vols(Vpal);
 %% Update TPM by introducing a new tpm between GM and WM
 min_tpm = crc_USwL_get_defaults('uTPM.min_tpm');
 min_tpm_icv = crc_USwL_get_defaults('uTPM.min_tpm_icv');
+
 vval_tpm = reshape(val_tpm , [prod(SZ(1:3)) SZ(4)]) - min_tpm;
 vval_utpm = zeros(prod(SZ(1:3)),SZ(4)+1);
 
-vval_utpm(:,2) = vval_tpm(:,1).*val_pal(:) - min_tpm_icv; % Pallidum
-vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,2); % GM
-vval_utpm(:,3:SZ(4)+1) = vval_tpm(:,2:SZ(4)); % rest
+vval_utpm(:,7) = (vval_tpm(:,1)- min_tpm_icv).*val_pal(:) ; % Pallidum
+vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus pallidum
+vval_utpm(:,2:SZ(4)) = vval_tpm(:,2:SZ(4)); % rest
+
 vval_utpm = vval_utpm*(1+SZ(4)*min_tpm)/(1+(SZ(4)+1)*min_tpm)+ min_tpm ; % non-zero everywhere
 val_utpm = reshape(vval_utpm,[SZ(1:3) SZ(4)+1]);
 
-% Save into file
+% vval_utpm(:,7) = vval_tpm(:,1).*val_pal(:) - min_tpm_icv; % Pallidum
+% vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus pallidum
+% vval_utpm(:,2:SZ(4)) = vval_tpm(:,2:SZ(4)); % rest
+% 
+% vval_utpm = vval_utpm*(1+SZ(4)*min_tpm)/(1+(SZ(4)+1)*min_tpm)+ min_tpm ; % non-zero everywhere
+% val_utpm = reshape(vval_utpm,[SZ(1:3) SZ(4)+1]);
+
+%% Save into file
 fn_TPMu = fullfile(dr_SB, spm_file(fn_TPM,'suffix','_uMPM'));
 Vtpm_u = Vtpm;
 Vtpm_u(7) = Vtpm(6);
@@ -101,9 +122,12 @@ for ii=1:7
     Vtpm_u(ii) = spm_write_vol(Vtpm_u(ii),val_utpm(:,:,:,ii));
 end
 
+% Some checks
+zz = sum(vval_utpm,2)';
+fplot(zz-1)
+zz = sum(vval_tpm,2)';
+fplot(zz)
 
-% zz = sum(vval_utpm,2)';
-% fplot(zz)
-% zz = sum(vval_tpm,2)';
-% fplot(zz)
-
+zz = min(vval_utpm,[],2)';
+fplot(zz)
+any(zz<0)
