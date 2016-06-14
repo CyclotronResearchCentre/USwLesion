@@ -20,8 +20,8 @@ function USwL = tbx_scfg_USwL
 imgMsk         = cfg_files;
 imgMsk.tag     = 'imgMsk';
 imgMsk.name    = 'Mask image';
-imgMsk.help    = {'Select the "lesion mask" image. This should be a binary 1/0 image'
-    'the thresholded mask t_Mask based on a min size of 8 voxel and the'
+imgMsk.help    = {'Select the "lesion mask" image. This should be a binary 1/0 image '...
+    'the thresholded mask t_Mask based on a min size of 8 voxel and the'...
     ' slighlty dilated mask dt_Msk will be saved on the drive'};
 imgMsk.filter = 'image';
 imgMsk.ufilter = '.*';
@@ -33,9 +33,10 @@ imgMsk.num     = [1 1];
 imgRef         = cfg_files;
 imgRef.tag     = 'imgRef';
 imgRef.name    = 'Structural reference image';
-imgRef.help    = {'This image is used 1st to map the lesion mask into MNI and generate '
-    'the subjec specific TPM. The masked image k_img and the brain mask icv_k_ing are'
-    'saved on the drive'};
+imgRef.help    = {'Select 1 reference structural image.'
+    'This image is used 1st to map the lesion mask into MNI and generate ' ...
+    'the subjec specific TPM. This would typically be a T1 or MT weighted image. ' ...
+    'The masked image k_img and the brain mask icv_k_ing are saved on the drive'};
 imgRef.filter = 'image';
 imgRef.ufilter = '.*';
 imgRef.num     = [1 1];
@@ -47,7 +48,7 @@ imgMPM         = cfg_files;
 imgMPM.tag     = 'imgMPM';
 imgMPM.name    = 'Structural quantitative images';
 imgMPM.help    = {'Select the structural quantitative (MPM-VBQ) images .'
-    'These will be segmented and warped into MNI space.'};
+    'These will be segmented, including the lesioned area, and warped into MNI space.'};
 imgMPM.filter = 'image';
 imgMPM.ufilter = '.*';
 imgMPM.num     = [0 Inf];
@@ -59,7 +60,8 @@ imgMPM.val       = {''};
 imgOth         = cfg_files;
 imgOth.tag     = 'imgOth';
 imgOth.name    = 'Other structural images';
-imgOth.help    = {'Select the other structural images, for example the FLAIR image that was used to create the "lesion mask".'
+imgOth.help    = {'Select the other structural images.'
+    'For example the FLAIR image that was used to create the "lesion mask". ' ...
     'These will be segmented and warped into MNI space.'};
 imgOth.filter = 'image';
 imgOth.ufilter = '.*';
@@ -76,7 +78,7 @@ imgTpm         = cfg_files;
 imgTpm.tag     = 'imgTpm';
 imgTpm.name    = 'Tissue probability maps';
 imgTpm.help    = {'Select the TPM images. '
-    ['A TPM_les file will be created with lesions as', ...
+    ['A TPM_les file will be created from this file with lesions as', ...
      ' a new tissue class in 3rd position!']};
 imgTpm.filter  = 'image';
 imgTpm.ufilter = '.*';
@@ -89,7 +91,7 @@ imgTpm.def     = @(val)crc_USwL_get_defaults('segment.imgTpm', val{:});
 img4US         = cfg_menu;
 img4US.tag     = 'img4US';
 img4US.name    = 'Images to use for the segmentation';
-img4US.help    = {'Choose which image(s) are used for the segmentation '
+img4US.help    = {'Choose which image(s) are used for the segmentation '...
     'and estimation of the warping into MNI space.'};
 img4US.labels = {
     'Structural reference only'
@@ -244,9 +246,11 @@ NbGaussian.tag     = 'NbGaussian';
 NbGaussian.name    = 'Number of Gaussians per tissue class';
 NbGaussian.help    = {'Set the number of Gaussians per tissue class to model the intensity histograms.' ,...
     ['The 7 numbers corresponds to the 7 tissue classess in the following order : ', ...
-    'GM, WM, Lesion, CSF, Skull, Soft tissues, and Air']};
+    'GM, WM, Lesion, CSF, Skull, Soft tissues, and Air.'], ...
+    ['When using MPMs on "older" subject, it is useful to separately model ',...
+    'the pallidum with an 8th tissue class, thus 8 number of Gausians.']};
 NbGaussian.strtype = 'n';
-NbGaussian.num     = [1 7];
+NbGaussian.num     = [1 Inf];
 NbGaussian.def     = @(val)crc_USwL_get_defaults('segment.NbGaussian', val{:});
 
 % ---------------------------------------------------------------------
