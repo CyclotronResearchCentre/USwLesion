@@ -560,7 +560,8 @@ tpm_l = spm_read_vols(Vl);
 % 2) ensure minium value all over
 % 3) concatenate by setting lesion at last position & adjust 'other' class
 tpm_Lu = (1-1/opt.tpm_ratio)*tpm_l.*tpm_healthy; % update lesion tpm
-tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV, ICV defined based on WM > min_tpm_icv
+tpm_Lu(tpm_Lu<opt.min_tpm) = opt.min_tpm; % at least min_tpm everywhere
+% tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV, ICV defined based on WM > min_tpm_icv
 tpm_ext = cat(4,tpm_orig,tpm_Lu); % put lesion at the end
 
 switch opt.tpm4lesion % update healthy tissue classes
