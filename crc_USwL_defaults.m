@@ -30,8 +30,6 @@ global uswl_def
 % Parameters for the segmentation with lesion 
 %==========================================================================
 uswl_def.segment.imgTpm     = {fullfile(spm('dir'),'tpm','TPM.nii')};
-uswl_def.segment.imgTpm4MPM = {fullfile(spm('dir'),'toolbox', ...
-                'USwLesion','Script_and_batches','unwTPM_sl2_uMPM.nii')};
 uswl_def.segment.img4US     = 1;
 uswl_def.segment.tpm4lesion = 1;
 uswl_def.segment.biasreg    = 1e-05; % almost nothing, assuming we use MPMs
@@ -47,6 +45,7 @@ uswl_def.segment.cleanup    = 1;
 % Parameters for the segmentation of masked anatomican reference (to build
 % the updated TPM)
 %==========================================================================
+uswl_def.msksegm.imgTpm     = {fullfile(spm('dir'),'tpm','TPM.nii')};
 uswl_def.msksegm.biasreg    = 1e-05; % almost nothing, assuming we use MPMs
 uswl_def.msksegm.biasfwhm   = Inf; % no bias correction
 uswl_def.msksegm.biaswr     = [0 0]; % Not saving bias corrected/field images
