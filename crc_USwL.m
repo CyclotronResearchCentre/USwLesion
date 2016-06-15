@@ -188,7 +188,7 @@ fn_mwCimg = spm_select('FPList',pth,'^mwc[0-9].*\.nii$'); % modulated warped
 
 % When using pallidum, i.e. extended TPM, then recombine GM with pallidum
 %  -> add c8 onto c1 -> only 1 image (c1) with GM + c8 with pallidum.
-if NbGaussian==8
+if numel(NbGaussian)==8
     add_2_images(fn_Cimg([1 end],:),  fn_Cimg(1,:), 2); % uint8
     add_2_images(fn_rCimg([1 end],:), fn_rCimg(1,:), 16); % float32
     add_2_images(fn_wCimg([1 end],:), fn_wCimg(1,:), 2); % uint8
