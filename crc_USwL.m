@@ -499,7 +499,8 @@ fn_ICV = fullfile(pth_img,fn_ICV);
 end
 
 %% STEP 4: Updating the TPM with an extra class, the lesion
-% Note that the lesion is inserted in *3rd position*, between WM and CSF!
+% Note that in the resulting TPM the lesion is inserted in *3rd position*, 
+% i.e. between WM and CSF!
 function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 % fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 %
@@ -541,27 +542,42 @@ else
     tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
 end
 
-switch opt.tpm4lesion % Read in the healthy tissue prob map.
+% Read in the healthy tissue prob map 
+% + define some masks for where lesion could also be and ICV area
+msk_ICV = tpm_WM>=opt.min_tpm_icv;
+switch opt.tpm4lesion
     case 0 % GM only
         tpm_healthy = tpm_GM;
+        msk_les_possible = (tpm_GM>=tpm_WM) & (tpm_GM>=tpm_CSF);
+
     case 1 % WM only
         tpm_healthy = tpm_WM;
+        msk_les_possible = (tpm_WM>=tpm_GM) & (tpm_WM>=tpm_CSF);
     case 2 % WM+GM
         tpm_healthy = tpm_GM+tpm_WM;
+        msk_les_possible = tpm_WM+tpm_GM>=tpm_CSF;
     case 3 % WM+GM+CSF
         tpm_healthy = tpm_GM+tpm_WM+tpm_CSF;
+        msk_les_possible = tpm_healthy>=opt.min_tpm_icv;
     otherwise
         error('Wrong tissue flag');
 end
+% load smooth lesion mask = tentative lesion tpm
 Vl = spm_vol(fn_swtMsk);
 tpm_l = spm_read_vols(Vl);
+% define where lesion could also be as smoothed version of msk_les_possible
+prob_l_possible = uint8(zeros(size(msk_les_possible)));
+fwhm = 4./sqrt(sum(Vtpm(1).mat(1:3,1:3).^2)); % 4mm expressed in voxels
+spm_smooth(uint8(msk_les_possible*255),prob_l_possible,fwhm);
+prob_l_possible = double(prob_l_possible)/255;
 
-% 1) scale lesion tpm and adjust healthy tissue prob map in ICV
+% 1) scale lesion tpm and adjust with healthy tissue prob map in ICV
 % 2) ensure minium value all over
 % 3) concatenate by setting lesion at last position & adjust 'other' class
 tpm_Lu = (1-1/opt.tpm_ratio)*tpm_l.*tpm_healthy; % update lesion tpm
+l_les_possible = find( (prob_l_possible(:)*opt.min_tpm_icv>tpm_Lu(:)) & (prob_l_possible(:)>0) );
+tpm_Lu(l_les_possible) = prob_l_possible(l_les_possible)*opt.min_tpm_icv; % min_tpm_icv x prob of possible lesion
 tpm_Lu(tpm_Lu<opt.min_tpm) = opt.min_tpm; % at least min_tpm everywhere
-% tpm_Lu(tpm_WM>=opt.min_tpm_icv & tpm_Lu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV, ICV defined based on WM > min_tpm_icv
 tpm_ext = cat(4,tpm_orig,tpm_Lu); % put lesion at the end
 
 switch opt.tpm4lesion % update healthy tissue classes
@@ -570,15 +586,15 @@ switch opt.tpm4lesion % update healthy tissue classes
         % equiv. to tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         if tpm_std
             tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
-            tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_GMu(msk_ICV & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_GMu; % update GM
         else
             tpm_Gu = tpm_GMu./(1+alpha);
             tpm_Pu = tpm_GMu - tpm_Gu;
             tpm_Gu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
-            tpm_Gu(tpm_WM>=opt.min_tpm_icv & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Gu(msk_ICV & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
-            tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Pu(msk_ICV & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
             tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
         end
@@ -586,25 +602,25 @@ switch opt.tpm4lesion % update healthy tissue classes
         tpm_WMu = tpm_healthy - tpm_Lu;
         % equiv. to tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
-        tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_WMu(msk_ICV & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
         tpm_ext(:,:,:,2) = tpm_WMu; % update WM
     case 2 % WM+GM
         tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
-        tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_WMu(msk_ICV & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
         tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         if tpm_std
             tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
-            tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_GMu(msk_ICV & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_GMu; % update GM
             tpm_ext(:,:,:,2) = tpm_WMu; % update WM
         else
             tpm_Gu = tpm_GMu./(1+alpha);
             tpm_Pu = tpm_GMu - tpm_Gu;
             tpm_Gu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
-            tpm_Gu(tpm_WM>=opt.min_tpm_icv & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Gu(msk_ICV & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
-            tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Pu(msk_ICV & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
             tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
             tpm_ext(:,:,:,2) = tpm_WMu; % update WM
@@ -612,14 +628,14 @@ switch opt.tpm4lesion % update healthy tissue classes
     case 3 % WM+GM+CSF
         tpm_WMu = tpm_WM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_WMu(tpm_WMu<opt.min_tpm) = opt.min_tpm;
-        tpm_WMu(tpm_WM>=opt.min_tpm_icv & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_WMu(msk_ICV & tpm_WMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
         tpm_CSFu = tpm_CSF .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         tpm_CSFu(tpm_CSFu<opt.min_tpm) = opt.min_tpm;
-        tpm_CSFu(tpm_WM>=opt.min_tpm_icv & tpm_CSFu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+        tpm_CSFu(msk_ICV & tpm_CSFu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
         tpm_GMu = tpm_GM .* (1 - (1-1/opt.tpm_ratio) * tpm_l);
         if tpm_std
             tpm_GMu(tpm_GMu<opt.min_tpm) = opt.min_tpm;
-            tpm_GMu(tpm_WM>=opt.min_tpm_icv & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_GMu(msk_ICV & tpm_GMu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_GMu; % update GM
             tpm_ext(:,:,:,2) = tpm_WMu; % update WM
             tpm_ext(:,:,:,3) = tpm_CSFu; % update CSF
@@ -627,9 +643,9 @@ switch opt.tpm4lesion % update healthy tissue classes
             tpm_Gu = tpm_GMu./(1+alpha);
             tpm_Pu = tpm_GMu - tpm_Gu;
             tpm_Gu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
-            tpm_Gu(tpm_WM>=opt.min_tpm_icv & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Gu(msk_ICV & tpm_Gu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
-            tpm_Pu(tpm_WM>=opt.min_tpm_icv & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
+            tpm_Pu(msk_ICV & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
             tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
             tpm_ext(:,:,:,2) = tpm_WMu; % update WM
