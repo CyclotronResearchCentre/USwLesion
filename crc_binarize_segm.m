@@ -28,14 +28,14 @@ function [fn_out,fn_nc] = crc_binarize_segm(fn_in,fn_msk,opt)
 %   .bin_ML      : "most likely" binarization (true by default)
 %   .bin_mltr    : "more likely than the rest" binarization, (false by default)
 %   .thr         : fixed threshold for classic binarization (.2 by default)
-%   .singleImg   : force consider there is only one single image for input 
+%   .singleImg   : force consider there is only one single image for input
 %                  (false by default).
 %
 % OUTPUT:
 % - fn_out : file name of the binarized tissue classes (b_i) or a 4D array
 %            with the voxel values
 % - fn_nc  : file name of the no-class voxel image (nc) or 3D array with
-%            the voxel values
+%            the voxel values, inside the mask space if provided.
 %
 % NOTE:
 % - the ML and mltr binarization are mutually exclusive, i.e. only one of
@@ -107,7 +107,7 @@ else
     apply_mask = true; % use mask but should do further checks!
     if ischar(fn_msk) && ischar(fn_in)
         V_msk = spm_vol(fn_msk);
-        spm_check_orientations([V_in(1) ; V_mask])
+        spm_check_orientations([V_in(1) ; V_msk])
         vx_msk = spm_read_vols(V_msk);
         vx_msk = vx_msk(:);
     elseif isnumerical(fn_msk) && isnumeric(fn_in)
@@ -134,14 +134,18 @@ bi = zeros(prod(SZ_in(1:end-1)),Nb_in);
 
 if opt.bin_classic
     bi = vx_in>opt.thr;
+    bi_classic = bi;
 end
 
 if opt.bin_ML % should have a p higher than all the others individually
     list_c = 1:Nb_in;
-    u_vec = zeros(1,Nb_in-1);
-    for ii=1:list_c %#ok<*BDSCI>
+    u_vec = ones(1,Nb_in-1);
+    for ii=list_c
         list_c_ii = list_c; list_c_ii(ii) = []; % list of others
         bi(:,ii) = sum((vx_in(:,ii)*u_vec)>vx_in(:,list_c_ii),2)==(Nb_in-1);
+    end
+    if opt.bin_classic
+        bi = bi.*bi_classic;
     end
 end
 
@@ -151,6 +155,9 @@ if opt.bin_mltr % should have a p higher than the sum of the others
     for ii=1:list_c %#ok<*BDSCI>
         list_c_ii = list_c; list_c_ii(ii) = []; % list of others
         bi(:,ii) = (vx_in(:,ii)*u_vec)>sum(vx_in(:,list_c_ii),2);
+    end
+    if opt.bin_classic
+        bi = bi.*bi_classic;
     end
 end
 
@@ -170,15 +177,17 @@ end
 %% write down images or pass values
 if save_img
     % create images from bi and nc
-    fn_out = spm_file(fn_in, 'prefix', 'b');
+    fn_out = spm_file(fn_in, 'prefix', 'b', 'number', '');
     V_out = V_in;
     for ii=1:Nb_in
         V_out(ii).fname = deblank(fn_out(ii,:));
+        V_out(ii).dt(1) = 2;
         V_out(ii) = spm_write_vol(V_out(ii),reshape(bi(:,ii),SZ_in(1:end-1)));
     end
-    fn_nc = spm_file(fn_in(1,:), 'prefix', 'nc');
+    fn_nc = spm_file(fn_in(1,:), 'prefix', 'nc', 'number', '');
     V_nc = V_in(1);
     V_nc.fname = deblank(fn_nc);
+    V_nc.dt(1) = 2;
     V_nc = spm_write_vol(V_nc,reshape(nc,SZ_in(1:end-1))); %#ok<*NASGU>
 else
     % just change the name
