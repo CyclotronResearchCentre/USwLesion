@@ -31,6 +31,9 @@ function [fn_out,fn_nc] = crc_binarize_segm(fn_in,fn_msk,opt)
 %   .singleImg   : force consider there is only one single image for input
 %                  (this is to avoid some dimension issue when hadnling the
 %                  images) [0, def].
+%   .ListOut     : index of input images that need to be written out, only
+%                  when images are written on disk. If 0, then all images 
+%                  are written [0, def.].
 %
 % OUTPUT:
 % - fn_out : file name of the binarized tissue classes (bci) or a 4D array
@@ -50,7 +53,7 @@ function [fn_out,fn_nc] = crc_binarize_segm(fn_in,fn_msk,opt)
 %   ML/mltr binarization, as they require at least 2 images!
 %
 %_______________________________________________________________________
-% Copyright (C) 2015 Cyclotron Research Centre
+% Copyright (C) 2016 Cyclotron Research Centre
 
 % Written by C. Phillips.
 % Cyclotron Research Centre, University of Liege, Belgium
@@ -61,11 +64,12 @@ opt_def = struct(... % Default options
     'bin_ML', true, ...
     'bin_mltr', false, ...
     'singleImg', false, ...
+    'ListOut', 0, ...
     'thr', .2);
 opt = crc_check_flag(opt_def,opt);
 
 if opt.singleImg
-    opt.bin_ML = false;   %\_ No comaprison across multiple maps possible
+    opt.bin_ML = false;   %\_ No comparison across multiple maps possible
     opt.bin_mltr = false; %/
 end
 
@@ -89,6 +93,11 @@ if ischar(fn_in)
     spm_check_orientations(V_in);
     vx_in = spm_read_vols(V_in);
     save_img = true;
+    if any(opt.ListOut)
+        save_list = opt.ListOut;
+    else
+        save_list = 1:numel(V_in);
+    end
 elseif isnumeric(fn_in)
     vx_in = fn_in;
     save_img = false;
@@ -182,12 +191,14 @@ end
 %% write down images or pass values
 if save_img
     % create images from bi and nc
-    fn_out = spm_file(fn_in, 'prefix', 'b', 'number', '');
-    V_out = V_in;
-    for ii=1:Nb_in
+    Nb_out = numel(save_list);
+    fn_out = spm_file(fn_in(save_list,:), 'prefix', 'b', 'number', '');
+    V_out = V_in(1:Nb_out);
+    for ii=1:Nb_out
         V_out(ii).fname = deblank(fn_out(ii,:));
         V_out(ii).dt(1) = 2;
-        V_out(ii) = spm_write_vol(V_out(ii),reshape(bi(:,ii),SZ_in(1:end-1)));
+        V_out(ii) = spm_write_vol(V_out(ii), ...
+            reshape(bi(:,save_list(ii)),SZ_in(1:end-1)));
     end
     fn_nc = spm_file(fn_in(1,:), 'prefix', 'nc', 'number', '');
     V_nc = V_in(1);
@@ -195,7 +206,7 @@ if save_img
     V_nc.dt(1) = 2;
     V_nc = spm_write_vol(V_nc,reshape(nc,SZ_in(1:end-1))); %#ok<*NASGU>
 else
-    % just change the name
+    % just change the name of variables for the output
     fn_out = reshape(bi,SZ_in);
     fn_nc = reshape(nc,SZ_in(1:end-1));
 end
