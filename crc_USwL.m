@@ -37,11 +37,17 @@ if isempty(fn_in{3})
 else
     nMPM = size(fn_in{3},1);
 end
+if isempty(fn_in{4})
+    nOth = 0;
+else
+    nOth = size(fn_in{4},1);
+end
 
 % Check #Gaussians and #TPMs for the USwLesion segmentation.
 NbGaussian = job.options.NbGaussian;
-fn_tpm_USwL = job.options.imgTpm;
-Vtpm_USwL = spm_vol(fn_tpm_USwL{1});
+fn_tpm_USwL = job.options.imgTpm{1};
+fn_tpm_USwL = spm_file(fn_tpm_USwL,'number','')
+Vtpm_USwL = spm_vol(fn_tpm_USwL);
 if numel(NbGaussian)~=(numel(Vtpm_USwL)+1)
     error('There are %d tpm (incl. lesion) but only %d #Gaussians provided', ...
         numel(Vtpm_USwL)+1,numel(NbGaussian));
@@ -120,13 +126,25 @@ if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs
     end
     fn_in{3} = fn_tmp(2:end,:);
     fn_swICV = spm_file(fn_ICV,'prefix','sw');
+    % Mask other images too!
+    fn_tmp = [];
+    for ii=1:nOth
+        fn_Oth_ii = deblank(fn_in{4}(ii,:));
+        Vi(1) = spm_vol(fn_Oth_ii);
+        Vi(2) = spm_vol(fn_ICV);
+        Vo = Vi(1);
+        Vo.fname = spm_file(fn_Oth_ii,'prefix','k');
+        Vo = spm_imcalc(Vi,Vo,'i1.*i2');
+        fn_tmp = char(fn_tmp,Vo.fname);
+    end
+    fn_in{4} = fn_tmp(2:end,:);
 end
 
 %% 4. Update the TPMs to include an extra tissue class -> TPMms
 % Note that the lesion is inserted in *3rd position*, between WM and CSF!
 opt_tpm = struct(...
     'tpm4lesion', job.options.tpm4lesion, ... % tissues to be modified for lesion (0/1/2/3) for GM / WM / GM+WM / GM+WM+CSF
-    'fn_tpm', fn_tpm_USwL{1}, ... % tpm file name
+    'fn_tpm', fn_tpm_USwL, ... % tpm file name
     'tpm_ratio', opt.tpm_ratio, ... % ratio between healthy and lesion tissue
     'min_tpm_icv', opt.min_tpm_icv, ... % minimum value in intracranial volume
     'min_tpm', opt.min_tpm); % minum value overall
@@ -149,7 +167,7 @@ switch job.options.img4US
         fn_Img2segm = fn_in{2}; %#ok<*CCAT1>
     case 1
         if isempty(fn_in{3}) % if no MPM
-            if isempty(fn_in{4}) % and no others
+            if ~nOth % and no others
                 fn_Img2segm = char(fn_in{2}); % use struct
             else
                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
@@ -160,7 +178,7 @@ switch job.options.img4US
     case 2
         % fn_Img2segm = char(fn_in{3} , fn_in{4}); 
         if isempty(fn_in{3}) % if no MPM 
-            if isempty(fn_in{4}) % and no others 
+            if ~nOth % and no others 
                 fn_Img2segm = char(fn_in{2}); % use struct
             else
                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
