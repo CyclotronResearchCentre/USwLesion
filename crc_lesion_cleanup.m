@@ -23,7 +23,7 @@ function Pout = crc_lesion_cleanup(Pin,k,prefix)
 %_______________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
 
-if narg<2
+if nargin<2
     prefix = 'cleaned_';
 end
 if nargin<1
