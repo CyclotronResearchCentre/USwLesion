@@ -1,3 +1,5 @@
+% script_process_MSchallengeData
+% 
 %% Batch to process all the MSchallenge data.
 %
 % This works subject by subject and performs the followign operation to
@@ -30,8 +32,8 @@
 % Cyclotron Research Centre, University of Liege, Belgium
 
 %% Define & intialize stuff
-% rootDir = 'D:\ccc_DATA\MSchallenge';
-rootDir = 'D:\ccc_DATA\MSchallenge\TESTING\';
+rootDir = 'D:\ccc_DATA\MSchallenge';
+% rootDir = 'D:\ccc_DATA\MSchallenge\TESTING\';
 dn = {'CHB','UNC'};
 fn_results = fullfile(rootDir,'MSchal_USwL_results');
 res = struct('mJ',[],'mHd',[],'overlap',[]);
@@ -63,13 +65,16 @@ dname(1,:) = [];
 nDir = size(dname,1);
 res(nDir,3) = res;
 
-%%
+%% Getting started
 MBempty = load(fullfile(rootDir,fn_batch));
 prblm = false(nDir,1);
+
 %% Loop over the subjects
+fprintf('\n\n')
 for idir = 1:nDir
     try
         subjDir = dname(idir,:);
+        fprintf('Processing subject %d out of %d in : %s\n',idir,nDir,subjDir)
         % 1. Collect filenames
         fn_T1 = spm_select('FPList',subjDir,'^.*_T1.nii$');
         fn_T2 = spm_select('FPList',subjDir,'^.*_T2.nii$');
