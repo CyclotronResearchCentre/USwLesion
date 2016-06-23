@@ -33,10 +33,10 @@ imgMsk.num     = [1 1];
 imgRef         = cfg_files;
 imgRef.tag     = 'imgRef';
 imgRef.name    = 'Structural reference image';
-imgRef.help    = {'Select 1 reference structural image.'
-    'This image is used 1st to map the lesion mask into MNI and generate ' ...
+imgRef.help    = {'Select 1 reference structural image.', ...
+    ['This image is used 1st to map the lesion mask into MNI and generate ' ...
     'the subjec specific TPM. This would typically be a T1 or MT weighted image. ' ...
-    'The masked image k_img and the brain mask icv_k_ing are saved on the drive'};
+    'The masked image k_img and the brain mask icv_k_ing are saved on the drive']};
 imgRef.filter = 'image';
 imgRef.ufilter = '.*';
 imgRef.num     = [1 1];
@@ -47,7 +47,7 @@ imgRef.num     = [1 1];
 imgMPM         = cfg_files;
 imgMPM.tag     = 'imgMPM';
 imgMPM.name    = 'Structural quantitative images';
-imgMPM.help    = {'Select the structural quantitative (MPM-VBQ) images .'
+imgMPM.help    = {'Select the structural quantitative (MPM-VBQ) images .', ...
     'These will be segmented, including the lesioned area, and warped into MNI space.'};
 imgMPM.filter = 'image';
 imgMPM.ufilter = '.*';
@@ -60,9 +60,9 @@ imgMPM.val       = {''};
 imgOth         = cfg_files;
 imgOth.tag     = 'imgOth';
 imgOth.name    = 'Other structural images';
-imgOth.help    = {'Select the other structural images.'
-    'For example the FLAIR image that was used to create the "lesion mask". ' ...
-    'These will be segmented and warped into MNI space.'};
+imgOth.help    = {'Select the other structural images.', ...
+    ['For example the FLAIR image that was used to create the "lesion mask". ' ...
+    'These will be segmented and warped into MNI space.']};
 imgOth.filter = 'image';
 imgOth.ufilter = '.*';
 imgOth.num     = [0 Inf];
@@ -77,7 +77,7 @@ imgOth.val       = {''};
 imgTpm         = cfg_files;
 imgTpm.tag     = 'imgTpm';
 imgTpm.name    = 'Tissue probability maps';
-imgTpm.help    = {'Select the TPM images. '
+imgTpm.help    = {'Select the TPM images. ', ...
     ['A TPM_les file will be created from this file with lesions as', ...
      ' a new tissue class in 3rd position!']};
 imgTpm.filter  = 'image';
@@ -278,15 +278,15 @@ thrMPM.def     = @(val)crc_USwL_get_defaults('segment.thrMPM', val{:});
 % ---------------------------------------------------------------------
 ICVmsk         = cfg_menu;
 ICVmsk.tag     = 'ICVmsk';
-ICVmsk.name    = 'Create ICV-mask and mask the MPMs';
+ICVmsk.name    = 'Create ICV-mask and mask the MPMs & Other images';
 ICVmsk.help    = {['An ICV mask can be created from the reference structural ', ...
-    'image and applied onto the MPMs before the segmentation itself. ',...
+    'image and applied onto the MPMs/other images before the segmentation itself. ',...
     'This cleans up the images quite a bit and ', ...
     'is equivalent to "skull stripping". This helps, in some cases, the ', ...
     'multi-channel segmentation of the MPMs.']
     ['Note that the TPMs are also masked so that the images to segment ',...
     'and TPMs match together.']
-    'The masked MPM images are prefixed with ''k''.'};
+    'The masked MPM/other images are prefixed with ''k''.'};
 ICVmsk.labels = {
     'No'
     'Yes'
@@ -300,8 +300,10 @@ ICVmsk.def     = @(val)crc_USwL_get_defaults('segment.ICVmsk', val{:});
 thrLesion         = cfg_entry;
 thrLesion.tag     = 'thrLesion';
 thrLesion.name    = 'Thresholding the lesion mask';
-thrLesion.help    = {'Apply a spatial threshold on the lesion tissue class c3. ',...
-    '0 means no threshold, otherwise indicate k value or ''Inf'''};
+thrLesion.help    = {'Apply a spatial threshold on the lesion tissue class c3: ',...
+    '- 0 means no threshold;' ,... 
+    '- k indicates that only clusters ofs ize larger or equal to k are kept;', ...
+    '- ''Inf'' keeps only the largest cluster.'};
 thrLesion.num    = [1 1];
 thrLesion.def     = @(val)crc_USwL_get_defaults('segment.thrLesion', val{:});
 
