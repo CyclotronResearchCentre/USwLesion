@@ -148,53 +148,61 @@ nRes = numel(l_keep);
 % results
 modJaccard = zeros(nRes,3);
 mHausdDist = zeros(nRes,3);
-cl_stat = zeros(nRes,3,2);
-cl_label = {'tp','fp'};
-vx_stat = zeros(nRes,3,6);
-vx_label = {'tp','fp','tn','fn','mcc','CK'};
+cl_stat_tp = zeros(nRes,3);
+cl_stat_fp = zeros(nRes,3);
+% cl_stat = zeros(nRes,3,2);
+% cl_label = {'tp','fp'};
+% vx_stat = zeros(nRes,3,6);
+% vx_label = {'tp','fp','tn','fn','mcc','CK'};
+vx_stat_tp = zeros(nRes,3);
+vx_stat_fp = zeros(nRes,3);
+vx_stat_tn = zeros(nRes,3);
+vx_stat_fn = zeros(nRes,3);
+vx_stat_mcc = zeros(nRes,3);
+vx_stat_CK = zeros(nRes,3);
 confMat = zeros(nRes,3,4);
 for ii = 1:nRes
     idir = l_keep(ii);
     for jj=1:3
         modJaccard(ii,jj) = res(idir,jj).mJ;
         mHausdDist(ii,jj) = res(idir,jj).mHd;
-        cl_stat(ii,jj,1) = res(idir,jj).overlap.cluster.tp;
-        cl_stat(ii,jj,2) = res(idir,jj).overlap.cluster.fp;
-        vx_stat(ii,jj,1) = res(idir,jj).overlap.voxel.tp;
-        vx_stat(ii,jj,2) = res(idir,jj).overlap.voxel.fp;
-        vx_stat(ii,jj,3) = res(idir,jj).overlap.voxel.tn;
-        vx_stat(ii,jj,4) = res(idir,jj).overlap.voxel.fn;
-        vx_stat(ii,jj,5) = res(idir,jj).overlap.voxel.mcc;
-        vx_stat(ii,jj,6) = res(idir,jj).overlap.voxel.CK;
+%         cl_stat(ii,jj,1) = res(idir,jj).overlap.cluster.tp;
+%         cl_stat(ii,jj,2) = res(idir,jj).overlap.cluster.fp;
+%         vx_stat(ii,jj,1) = res(idir,jj).overlap.voxel.tp;
+%         vx_stat(ii,jj,2) = res(idir,jj).overlap.voxel.fp;
+%         vx_stat(ii,jj,3) = res(idir,jj).overlap.voxel.tn;
+%         vx_stat(ii,jj,4) = res(idir,jj).overlap.voxel.fn;
+%         vx_stat(ii,jj,5) = res(idir,jj).overlap.voxel.mcc;
+%         vx_stat(ii,jj,6) = res(idir,jj).overlap.voxel.CK;
+        cl_stat_tp(ii,jj) = res(idir,jj).overlap.cluster.tp;
+        cl_stat_fp(ii,jj) = res(idir,jj).overlap.cluster.fp;
+        vx_stat_tp(ii,jj) = res(idir,jj).overlap.voxel.tp;
+        vx_stat_fp(ii,jj) = res(idir,jj).overlap.voxel.fp;
+        vx_stat_tn(ii,jj) = res(idir,jj).overlap.voxel.tn;
+        vx_stat_fn(ii,jj) = res(idir,jj).overlap.voxel.fn;
+        vx_stat_mcc(ii,jj) = res(idir,jj).overlap.voxel.mcc;
+        vx_stat_CK(ii,jj) = res(idir,jj).overlap.voxel.CK;
         confMat(ii,jj,:) = res(idir,jj).overlap.voxel.cm(:);
     end
 end
 
 %% Display these results
-% Jaccard
-ms_modJaccard = [mean(modJaccard) ; std(modJaccard)];
-figure, hold on
-bar(1:3,ms_modJaccard(1,:))
-errorbar(1:3,ms_modJaccard(1,:),ms_modJaccard(2,:),'.')
-title(stat_labels{1})
-
-% Hausdorff
-ms_mHausdDist = [mean(mHausdDist) ; std(mHausdDist)];
-figure, hold on
-bar(1:3,ms_mHausdDist(1,:))
-errorbar(1:3,ms_mHausdDist(1,:),ms_mHausdDist(2,:),'.')
-title(stat_labels{2})
+% Jaccard & Hausdorff distance
+crc_MSchalResults(cat(3,modJaccard,mHausdDist),char('modified Jaccard','mean Hausdorff dist'));
 
 % Cluster
-ms_cluster = cat(3,squeeze(mean(cl_stat)) , squeeze(std(cl_stat))); size(ms_cluster)
-figure,
-subplot(2,1,1), hold on
-bar(1:3,ms_cluster(:,1))
-errorbar(1:3,ms_mHausdDist(:,1,1),ms_mHausdDist(:,2,1),'.')
-subplot(2,1,2), hold on
-bar(1:3,ms_cluster(:,2))
-errorbar(1:3,ms_mHausdDist(:,2,1),ms_mHausdDist(:,2,2),'.')
+crc_MSchalResults(cat(3,cl_stat_tp,cl_stat_fp),char('clust_TP','clust_FP'));
 
+% Voxels tp/fp/fn/tn
+crc_MSchalResults( ...
+    cat(3,vx_stat_tp,vx_stat_fp,vx_stat_fn,vx_stat_tn) , ...
+    char('vox.TP','vox.FP','vox.FN','vox.TN'));
+
+% Voxels mcc/CK
+crc_MSchalResults(cat(3,vx_stat_mcc,vx_stat_CK),char('vox.Mcc','vox.CK'));
+
+return
+%%
 idir = 15;
 subjDir = dname(idir,:)
 fn_images = char(...
