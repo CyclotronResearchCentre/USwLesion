@@ -1,5 +1,5 @@
 % script_process_MSchallengeData
-% 
+%
 %% Batch to process all the MSchallenge data.
 %
 % This works subject by subject and performs the followign operation to
@@ -38,6 +38,10 @@ dn = {'CHB','UNC'};
 fn_results = fullfile(rootDir,'MSchal_USwL_results');
 res = struct('mJ',[],'mHd',[],'overlap',[]);
 fn_batch = 'batch_segm_MSchallenge_empty.mat';
+
+% Choose what to do: 'Segment','BinAndClean' and/or 'Compare'
+% operation = {'Segment','BinAndClean','Compare'};
+operation = {'Compare'};
 
 % Set option for binarizing
 opt_bin = struct(... % DBinarization option
@@ -82,27 +86,37 @@ for idir = 1:nDir
         fn_lesmsk_ref = spm_select('FPList',subjDir,'^.*_lesion.nii$');
         fn_lesmsk_est = spm_select('FPList',subjDir,'^ples.*_FLAIR.nii$');
         % 2. Launch USwithLesion
-        matlabbatch = MBempty.matlabbatch;
-        matlabbatch{1}.spm.tools.USwLtools.uswl.imgMsk = {fn_lesmsk_est};
-        matlabbatch{1}.spm.tools.USwLtools.uswl.imgRef = {fn_T1};
-        matlabbatch{1}.spm.tools.USwLtools.uswl.imgMPM = cellstr(char(fn_T1, fn_T2));
-        matlabbatch{1}.spm.tools.USwLtools.uswl.imgOth = {fn_FLAIR};
-        spm_jobman('run', matlabbatch);
+        if any(strcmp('Segment',operation))
+            matlabbatch = MBempty.matlabbatch;
+            matlabbatch{1}.spm.tools.USwLtools.uswl.imgMsk = {fn_lesmsk_est};
+            matlabbatch{1}.spm.tools.USwLtools.uswl.imgRef = {fn_T1};
+            matlabbatch{1}.spm.tools.USwLtools.uswl.imgMPM = cellstr(char(fn_T1, fn_T2));
+            matlabbatch{1}.spm.tools.USwLtools.uswl.imgOth = {fn_FLAIR};
+            spm_jobman('run', matlabbatch);
+        end
         % get segmented images and ICVmsk
         fn_c1234 = spm_select('FPList',subjDir,'^c[1234]k.*_T1.nii$');
         fn_ICVmsk = spm_select('FPList',subjDir,'^icv_k.*_T1.nii$');
         % 3. Binarize and cleanup posterior lesion map
-        [fn_les_bin,fn_nc] = crc_binarize_segm(fn_c1234,fn_ICVmsk,opt_bin);
-        fn_les_clbin = crc_lesion_cleanup(fn_les_bin,clean_k,clean_prefix);
+        if any(strcmp('BinAndClean',operation))
+            [fn_les_bin,fn_nc] = crc_binarize_segm(fn_c1234,fn_ICVmsk,opt_bin);
+            fn_les_clbin = crc_lesion_cleanup(fn_les_bin,clean_k,clean_prefix);
+        else
+            fn_les_bin = spm_select('FPList',subjDir,'^bc3k.*_T1.nii$');
+            fn_nc = spm_select('FPList',subjDir,'^ncc1k.*_T1.nii$');
+            fn_les_clbin = spm_select('FPList',subjDir,'^cbc3k.*_T1.nii$');
+        end
         % 4. Apply comparison function & collect results
-        fn_ref = fn_lesmsk_ref;
-        fn_test = cellstr(char(fn_lesmsk_est,fn_les_bin,fn_les_clbin));
-        opt_ImgOv.mask = fn_ICVmsk;
-        for jj=1:numel(fn_test)
-            [mJ,mHd,overlap] = image_overlap(fn_ref,fn_test{jj},opt_ImgOv);
-            res(idir,jj).mJ = mJ;
-            res(idir,jj).mHd = mHd;
-            res(idir,jj).overlap = overlap;
+        if any(strcmp('Compare',operation))
+            fn_ref = fn_lesmsk_ref;
+            fn_test = cellstr(char(fn_lesmsk_est,fn_les_bin,fn_les_clbin));
+            opt_ImgOv.mask = fn_ICVmsk;
+            for jj=1:numel(fn_test)
+                [mJ,mHd,overlap] = image_overlap(fn_test{jj},fn_ref,opt_ImgOv);
+                res(idir,jj).mJ = mJ;
+                res(idir,jj).mHd = mHd;
+                res(idir,jj).overlap = overlap;
+            end
         end
     catch
         prblm(idir) = true;
@@ -111,31 +125,48 @@ end
 % save things!
 save(fn_results,'res')
 
+% List of problems
+if any(prblm)
+    fprintf('Problems in :\n')
+    for idir = find(prblm')
+        fprintf('\t %s\n',dname(idir,:))
+    end
+end
+
 %% Collect all results in arrays for further analysis
 % methods names
 methods_label = {'LST','bin_USwL','cbin_USwL'};
 stat_labels = {'modified Jaccard','mean Hausdorff dist','cluster','voxel'};
+
+% list of subjects to consider!
+% A few subjects have very small lesions and LST does NOT find them -> poor
+% starting estimate, -> USwL cannot help
+l_exclude = [2 3 10 11 15 18 19];
+l_keep = 1:nDir; l_keep(l_exclude) = [];
+nRes = numel(l_keep);
+
 % results
-modJaccard = zeros(nDir,3);
-mHausdDist = zeros(nDir,3);
-cl_stat = zeros(nDir,3,2);
+modJaccard = zeros(nRes,3);
+mHausdDist = zeros(nRes,3);
+cl_stat = zeros(nRes,3,2);
 cl_label = {'tp','fp'};
-vx_stat = zeros(nDir,3,6);
+vx_stat = zeros(nRes,3,6);
 vx_label = {'tp','fp','tn','fn','mcc','CK'};
-confMat = zeros(nDir,3,4);
-for idir = 1:nDir
+confMat = zeros(nRes,3,4);
+for ii = 1:nRes
+    idir = l_keep(ii);
     for jj=1:3
-        modJaccard(idir,jj) = res(idir,jj).mJ;
-        mHausdDist(idir,jj) = res(idir,jj).mHd;
-        cl_stat(idir,jj,1) = res(idir,jj).overlap.cluster.tp;
-        cl_stat(idir,jj,2) = res(idir,jj).overlap.cluster.fp;
-        vx_stat(idir,jj,1) = res(idir,jj).overlap.voxel.tp;
-        vx_stat(idir,jj,2) = res(idir,jj).overlap.voxel.fp;
-        vx_stat(idir,jj,3) = res(idir,jj).overlap.voxel.tn;
-        vx_stat(idir,jj,4) = res(idir,jj).overlap.voxel.fn;
-        vx_stat(idir,jj,5) = res(idir,jj).overlap.voxel.mcc;
-        vx_stat(idir,jj,6) = res(idir,jj).overlap.voxel.CK;
-        confMat(idir,jj,:) = res(idir,jj).overlap.voxel.cm(:);
+        modJaccard(ii,jj) = res(idir,jj).mJ;
+        mHausdDist(ii,jj) = res(idir,jj).mHd;
+        cl_stat(ii,jj,1) = res(idir,jj).overlap.cluster.tp;
+        cl_stat(ii,jj,2) = res(idir,jj).overlap.cluster.fp;
+        vx_stat(ii,jj,1) = res(idir,jj).overlap.voxel.tp;
+        vx_stat(ii,jj,2) = res(idir,jj).overlap.voxel.fp;
+        vx_stat(ii,jj,3) = res(idir,jj).overlap.voxel.tn;
+        vx_stat(ii,jj,4) = res(idir,jj).overlap.voxel.fn;
+        vx_stat(ii,jj,5) = res(idir,jj).overlap.voxel.mcc;
+        vx_stat(ii,jj,6) = res(idir,jj).overlap.voxel.CK;
+        confMat(ii,jj,:) = res(idir,jj).overlap.voxel.cm(:);
     end
 end
 
@@ -146,14 +177,16 @@ figure, hold on
 bar(1:3,ms_modJaccard(1,:))
 errorbar(1:3,ms_modJaccard(1,:),ms_modJaccard(2,:),'.')
 title(stat_labels{1})
+
 % Hausdorff
 ms_mHausdDist = [mean(mHausdDist) ; std(mHausdDist)];
 figure, hold on
 bar(1:3,ms_mHausdDist(1,:))
 errorbar(1:3,ms_mHausdDist(1,:),ms_mHausdDist(2,:),'.')
 title(stat_labels{2})
+
 % Cluster
-ms_cluster = [mean(cl_stat) ; std(cl_stat)];
+ms_cluster = cat(3,squeeze(mean(cl_stat)) , squeeze(std(cl_stat))); size(ms_cluster)
 figure,
 subplot(2,1,1), hold on
 bar(1:3,ms_cluster(:,1))
@@ -162,5 +195,16 @@ subplot(2,1,2), hold on
 bar(1:3,ms_cluster(:,2))
 errorbar(1:3,ms_mHausdDist(:,2,1),ms_mHausdDist(:,2,2),'.')
 
+idir = 15;
+subjDir = dname(idir,:)
+fn_images = char(...
+    spm_select('FPList',subjDir,'^k.*_T1.nii$'), ...
+    spm_select('FPList',subjDir,'^.*_lesion.nii$'), ...
+    spm_select('FPList',subjDir,'^ples.*_FLAIR.nii$'), ...
+    spm_select('FPList',subjDir,'^c3.*_T1.nii$'), ...
+    spm_select('FPList',subjDir,'^bc3.*_T1.nii$'), ...
+    spm_select('FPList',subjDir,'^cbc3.*_T1.nii$') ...
+    );
+spm_check_registration(fn_images)
 
 % end
