@@ -214,6 +214,7 @@ if nargout == 3
         [L1,num1] = spm_bwlabel(double(img1),26);
         
         % for each cluster in img2 check if img1 has one too
+        NP = zeros(1,num2);
         for n=1:num2
             NP(n) = length(intersect(find(img1),find(L2==n)));
             % divide by length(find(L2==n)) to get percentage per cluster;
@@ -221,6 +222,7 @@ if nargout == 3
         overlap.cluster.tp = length(find(NP)) / num2;
         
         % for each cluster in img1 check if img2 has one too
+        NN = zeros(1,num1);
         for n=1:num1
             NN(n) = length(intersect(find(L1==n),find(img2)));
         end
