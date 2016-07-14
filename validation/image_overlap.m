@@ -198,7 +198,7 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 Bxyz1_mm = v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
 Bxyz2_mm = v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
 
-[mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm); %#ok<*ASGLU>
+[mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm,'normalize','true');
 mHd = mean(mD);
 
 %% Overlap measures to ground truth
