@@ -1,8 +1,10 @@
 function [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2)
 % Calculate the mean Hausdorff distance between 2 surfaces, based on the
 % coordinates of the voxels of these surfaces.
-% This implementation only works with 3D volumes but is much faster than
+% This implementation only works with 3D coorinates but is much faster than
 % standard implementations (with for-loops).
+% Note that with the crc_borderVx.m function handles 2D images and return
+% the coordinates of border pixels as in 3D.
 %
 % FORMAT
 %   [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2)

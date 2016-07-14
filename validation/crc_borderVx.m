@@ -32,6 +32,9 @@ function varargout = crc_borderVx(vol)
 %% Get image sizes, define clique, etc.
 vol = vol>0;
 DIM = size(vol);
+if numel(DIM)==2 % 2D image case
+    DIM(3) = 1;
+end
 lMsk = find(vol(:));
 [X,Y,Z] = ndgrid(-1:1,-1:1,-1:1);
 clique = [X(:) Y(:) Z(:)];
