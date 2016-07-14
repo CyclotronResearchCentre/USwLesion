@@ -17,8 +17,7 @@ global uswl_def
 uswl_def.segment.NbGaussian = [2 2 2 2 1 1 1 2];
 uswl_def.segment.mrf        = 2;
 uswl_def.segment.cleanup    = 0;
-% uswl_def.segment.imgTpm     = {fullfile(spm('dir'),'tpm','unwTPM_sl2.nii')};
-uswl_def.segment.imgTpm     = {fullfile(spm('dir'),'toolbox','USwLesion','Script_and_batches','unwTPM_sl2_uMPM.nii')};
+uswl_def.segment.imgTpm     = {fullfile(spm('dir'),'toolbox','USwLesion','MPMtpm','unwTPM_sl2_uMPM.nii')};
 uswl_def.segment.thrMPM     = 1;
 uswl_def.segment.ICVmsk     = 1;
 
