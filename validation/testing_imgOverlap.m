@@ -1,4 +1,9 @@
 %% Small script to test the image overlapping measures
+%_______________________________________________________________________
+% Copyright (C) 2016 Cyclotron Research Centre
+
+% Written by C. Phillips.
+% Cyclotron Research Centre, University of Liege, Belgium
 
 %% 0/ Generate 3D-images with prespcified shapes
 sz = 100;
@@ -7,6 +12,8 @@ img1 = zeros(sz,sz);
 img1b = zeros(sz,sz);
 img2 = zeros(sz,sz);
 img2b = zeros(sz,sz);
+img3 = zeros(sz,sz);
+img3b = zeros(sz,sz);
 [X,Y] = meshgrid(1:sz,1:sz);
 
 % Add elements in img1: 2 disks of radius 20, centered on [25,25] & [75,75]
@@ -42,11 +49,20 @@ for ii=1:3
     img2b(Ds<=S(ii))=1;
 end
 
-% Display images
+% Add elements in img3/3b, each has one disk not overlapping with the one
+% from the other image.
+Dc = sqrt((X-Xc(1)).^2+(Y-Yc(1)).^2);
+img3(Dc<=R(1))=1;
+Dc = sqrt((X-Xc(2)).^2+(Y-Yc(2)).^2);
+img3b(Dc<=R(2))=1;
+
+% Display images 1/1b/2/2b
 AllImg = {img1,img1b,img2,img2b,img1+2*img2,img1+2*img2b,img1b+2*img2,img1b+2*img2b};
 flag.nRC = [4 2];
 flag.labels = {'img1','img1b','img2','img2b','img1+img2','img1+img2b','img1b+img2','img1b+img2b'};
 imat(AllImg,flag)
+
+imat({img3,img3b})
 
 %% 1/ Work out how to scale/better use the Hausdorff distance
 
@@ -77,8 +93,8 @@ fprintf('Mean distance from 1  to 2b : %2.2f and 2b to 1 : %2.2f, average %2.2f\
 fprintf('Mean distance from 1b to 2  : %2.2f and 2  to 1b: %2.2f, average %2.2f\n',mD1b2,mHd1b2)
 fprintf('Mean distance from 1b to 2b : %2.2f and 2b to 1b: %2.2f, average %2.2f\n',mD1b2b,mHd1b2b)
 
-%% COMMENTS:
-% As expected for the Hausdorff distnace:
+% COMMENTS:
+% As expected for the Hausdorff distance:
 % - the H-distances 1-to-2 and 1-to-2b are the same, as well as 1b-to-2 and
 %   1b-to-2b, 2-to-1 and 2-to-1b, and 2b-to-1 and 2b-to-1b
 % - H-distances 2-to-1 and 1b-to-2 are relatively larger because one of the 
@@ -110,6 +126,24 @@ subplot(5,1,5)
 bar(edg,dHist')
 legend('D1-2/2b','D2-1/1b','D1b-2/2b','D2b-1/1b')
 
+% Play with images 3/3b
+[iBx3,iBy3,iBz3] = crc_borderVx(img3);
+[iBx3b,iBy3b,iBz3b] = crc_borderVx(img3b);
+Bxyz3 = [iBx3' ; iBy3' ; iBz3'];
+Bxyz3b = [iBx3b' ; iBy3b' ; iBz3b'];
+[mD33b,D33b,D3b3] = crc_meanHausdorffDist(Bxyz3,Bxyz3b); %#ok<*ASGLU>
+mHd33b = mean(mD33b);
+figure, plot([D33b,D3b3])
+
+% closest point of 3b to 3:
+c = sqrt(R(2)^2/2);
+x_cl = Xc(2)-c; y_cl = Yc(2)-c;
+% distance from centre of img3 blob to closest point in img3b blob
+dC3_cl3b = sqrt((Xc(1)-x_cl)^2+(Yc(1)-y_cl)^2);
+fprintf('\n')
+fprintf('Distance from centre to other image blob : %2.2f\n',dC3_cl3b);
+fprintf('to be compared with mean H-distance : %2.2f\n',mHd33b);
+
 %% 2. Use the image_overlap function
 [mJ12,mHd12,overlap12]    = image_overlap(img1,img2);
 [mJ12b,mHd12b,overlap12b] = image_overlap(img1,img2b);
@@ -122,7 +156,7 @@ fprintf('Cohen''s kappa, \n\t 1-to-2 : %2.2f and 1-to_2b: %2.2f\n',overlap12.vox
 fprintf('Cluster TP, \n\t 1-to-2 : %2.2f and 1-to_2b: %2.2f\n',overlap12.cluster.tp,overlap12b.cluster.tp);
 fprintf('Cluster FP, \n\t 1-to-2 : %2.2f and 1-to_2b: %2.2f\n',overlap12.cluster.fp,overlap12b.cluster.fp);
 
-%% COMMENTS:
+% COMMENTS:
 % As expected the match is better at all level with 1-to-2b than 1-to-2
 
 
