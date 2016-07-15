@@ -3,15 +3,19 @@ function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
 % This function computes the matching between 2 3D images, based on
 % different measures:
 % - the modified Jaccard index
-% - the percentages of overlap between the two binary images.
+% - the overlap between the two binary images, in term of voxel and cluster 
+%   matching.
+% - the mean Hausdorff distance (border-to-border distance)
+% The 1st image can be seen as the source image and the 2nd as the
+% reference (ground truth) image.
 %
 % FORMAT:
 %   [mJ,mHd] = image_overlap(img1,img2,opt);
 %   [mJ,mHd,overlap] = image_overlap(img1,img2,opt);
 %
 % INPUT:
-%   - img1 and img2 are two image names or matrices, by default assuming
-%     these are binary images (but see opt below)
+%   - img1/img2 are two image names or matrices, by default assuming
+%     these are binary images (but see opt below).
 %     img1 can be seen as a source image and img2 as the reference
 %     (ground truth) image to computes overlap of source to the reference
 %     in that case only, is the overlap output a useful measure
