@@ -93,7 +93,8 @@ function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
 
 %%
 % *Check input data*
-opt_def = struct('thr',0,'mask',[],'v2r',eye(4)); % default options
+% default options
+opt_def = struct('thr',0,'mask',[],'v2r',eye(4),'BlobMatchOnly',false);
 
 if nargin == 0
     display_help_and_example % Simple example with synthetic images
@@ -193,16 +194,7 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 
 %%
 % *Extract the mean Hausdorff distance*
-
-% Get border coordinates in vx, not considering the mask!
-[iBx1,iBy1,iBz1] = crc_borderVx(img1);
-[iBx2,iBy2,iBz2] = crc_borderVx(img2);
-
-% Get coordinates in mm
-Bxyz1_mm = v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
-Bxyz2_mm = v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
-
-[mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm); %#ok<*ASGLU>
+[mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt); %#ok<*ASGLU>
 mHd = mean(mD);
 
 %% Overlap measures to ground truth
