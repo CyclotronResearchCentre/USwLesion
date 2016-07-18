@@ -103,7 +103,7 @@ elseif nargin == 2
     opt = []; % Go with the defaults
     
 elseif nargin < 2 || nargin > 3
-    error('Two or three inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,option)')
+    error('Two or three inputs are expected - FORMAT: [mJ,mHd,overlap] = percent_overlap(img1,img2,option)')
 end
 % Fill the opt structure with defaults
 opt = crc_check_flag(opt_def,opt);
