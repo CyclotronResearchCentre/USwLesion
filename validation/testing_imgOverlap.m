@@ -62,7 +62,8 @@ flag.nRC = [4 2];
 flag.labels = {'img1','img1b','img2','img2b','img1+img2','img1+img2b','img1b+img2','img1b+img2b'};
 imat(AllImg,flag)
 
-imat({img3,img3b})
+% imat({img1,img2})
+% imat({img3,img3b})
 
 %% 1/ Work out how to scale/better use the Hausdorff distance
 
