@@ -146,7 +146,7 @@ end
 % *Check the mask*
 
 mask = opt.mask;  % a mask field will be there, empty or not.
-if ~isempty(mask) % load if not empty
+if ~isempty(mask) % load/use if not empty
     if ischar(mask)
         if exist(mask,'file')
             V3 = spm_vol(mask);
@@ -194,7 +194,9 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 
 %%
 % *Extract the mean Hausdorff distance*
-[mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt); %#ok<*ASGLU>
+opt_HausDist.v2r = v2r;
+opt_HausDist.BlobMatchOnly = false; % switch to true ton only consider matching blobs
+[mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt_HausDist); %#ok<*ASGLU>
 mHd = mean(mD);
 
 %% Overlap measures to ground truth
