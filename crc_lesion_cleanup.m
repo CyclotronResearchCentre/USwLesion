@@ -45,8 +45,8 @@ else
     save_img = false;
 end
 
-[clustered_map,num] = spm_bwlabel(double(data>0),6);
-% note we use surface connection only
+[clustered_map,num] = spm_bwlabel(double(data>0),18);
+% note we use edge connection
 
 % check number of elements per clusters
 extent_map = zeros(size(data));
