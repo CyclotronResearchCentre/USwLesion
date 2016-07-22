@@ -1,4 +1,4 @@
-function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
+function [mJ,mHd,overlap,other] = image_overlap(img1,img2,opt)
 
 % This function computes the matching between 2 3D images, based on
 % different measures:
@@ -20,15 +20,17 @@ function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
 %     (ground truth) image to computes overlap of source to the reference
 %     in that case only, is the overlap output a useful measure
 %   - opt is a structure with a few processing options
-%       .thr is the threshold applied to both images to binarize them,
-%            otherwise any non-zero value is considered as 1.
-%            By default, thr=0, i.e. no thresholding is performed.
+%       .thr  is the threshold applied to both images to binarize them,
+%             otherwise any non-zero value is considered as 1.
+%             By default, thr=0, i.e. no thresholding is performed.
 %       .mask is a binary image indicating which pixels/voxels
-%        have to be taken into account (name or matrix)
-%        By default, no masking, i.e. [].
-%       .v2r voxel-to-realworld coordinates transformation, for the case
-%            where 3D arrays are passed directly.
-%            By default, anisotropic of size 1mm3, i.e. eye(4).
+%             have to be taken into account (name or matrix)
+%             By default, no masking, i.e. [].
+%       .v2r  voxel-to-realworld coordinates transformation, for the case
+%             where 3D arrays are passed directly.
+%             By default, anisotropic of size 1mm3, i.e. eye(4).
+%       .HDBM force the Hausdorff Distance to rely only on matched blobs or
+%             not [false, default].
 %
 % OUTPUT:
 %   - mJ: the modified Jaccard index (see Ref here under)
@@ -94,7 +96,7 @@ function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
 %%
 % *Check input data*
 % default options
-opt_def = struct('thr',0,'mask',[],'v2r',eye(4),'BlobMatchOnly',false);
+opt_def = struct('thr',0,'mask',[],'v2r',eye(4),'HDBM',false);
 
 if nargin == 0
     display_help_and_example % Simple example with synthetic images
@@ -195,14 +197,16 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 %%
 % *Extract the mean Hausdorff distance*
 opt_HausDist.v2r = v2r;
-opt_HausDist.BlobMatchOnly = false; % switch to true ton only consider matching blobs
+opt_HausDist.BlobMatchOnly = opt.HDBM;
 [mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt_HausDist); %#ok<*ASGLU>
 mHd = mean(mD);
+other.nDropped = nDropped;
+other.mD = mD;
 
 %% Overlap measures to ground truth
 % ----------------------------------
 
-if nargout == 3
+if nargout >= 3
     
     %%
     % *Compute percentage of overalp at the cluster level*
@@ -217,7 +221,9 @@ if nargout == 3
             NP(n) = length(intersect(find(img1),find(L2==n)));
             % divide by length(find(L2==n)) to get percentage per cluster;
         end
-        overlap.cluster.tp = length(find(NP)) / num2;
+        overlap.cluster.tp = sum(NP>0) / num2;
+        overlap.cluster.cm(1,1) = sum(NP>0); % #true positives
+        overlap.cluster.cm(1,2) = num2;      % #true clusters
         
         % for each cluster in img1 check if img2 has one too
         NN = zeros(1,num1);
@@ -225,9 +231,12 @@ if nargout == 3
             NN(n) = length(intersect(find(L1==n),find(img2)));
         end
         overlap.cluster.fp = sum(NN==0) / num1;
+        overlap.cluster.cm(2,1) = sum(NN==0); % #false positives
+        overlap.cluster.cm(2,2) = num1;       % #estimated clusters
     else
         overlap.cluster.tp = [];
         overlap.cluster.fp = [];
+        overlap.cluster.cm = [];
     end
     
     
