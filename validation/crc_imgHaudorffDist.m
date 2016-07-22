@@ -89,8 +89,8 @@ end
 [iBx2,iBy2,iBz2] = crc_borderVx(img2);
 
 % Get coordinates in mm
-Bxyz1_mm = v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
-Bxyz2_mm = v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
+Bxyz1_mm = opt.v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
+Bxyz2_mm = opt.v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
 
 % Calculate Hausdorff distance
 [mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm); %#ok<*ASGLU>
