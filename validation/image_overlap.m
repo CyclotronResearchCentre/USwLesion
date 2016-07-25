@@ -62,7 +62,7 @@ function [mJ,mHd,overlap,other] = image_overlap(img1,img2,opt)
 %   <https://en.wikipedia.org/wiki/Jaccard_index>
 %
 % The modified Jaccard index follows Maitra (2010)
-%   W(A,B) = N(intersect(A,B) / N(A)+N(B)-N(intersect(A,B))
+%   W(A,B) = N(intersect(A,B)) / N(A)+N(B)-N(intersect(A,B))
 %   <http://www.ncbi.nlm.nih.gov/pubmed/19963068>
 %
 % Haussdorf distance:
@@ -122,21 +122,21 @@ if ischar(img1)
     if exist(img1,'file')
         V1 = spm_vol(img1);
         img1 =spm_read_vols(V1);
-        v2r = V1.mat;
     else
         error('the file %s doesn''t exist',spm_file(img1,'filename'))
     end
-else
-    v2r = opt.v2r; % Use passed v2r or default one
 end
 
 if ischar(img2)
     if exist(img2,'file')
         V2 = spm_vol(img2);
         img2 =spm_read_vols(V2);
+        v2r = V2.mat;
     else
         error('the file %s doesn''t exist',spm_file(img2,'filename'))
     end
+else
+    v2r = opt.v2r; % Use passed v2r or default one
 end
 
 % check dimensions
@@ -196,9 +196,9 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 
 %%
 % *Extract the mean Hausdorff distance*
-opt_HausDist.v2r = v2r;
-opt_HausDist.BlobMatchOnly = opt.HDBM;
-[mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt_HausDist); %#ok<*ASGLU>
+opt_HD.v2r = v2r;
+opt_HD.BMO = opt.HDBM;
+[mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt_HD); %#ok<*ASGLU>
 mHd = mean(mD);
 other.nDropped = nDropped;
 other.mD = mD;
