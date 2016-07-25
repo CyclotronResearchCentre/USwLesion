@@ -19,7 +19,7 @@ function [mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt)
 %   img1/2  binary 3D array, voxels with 1's are the clusters
 %   opt         some options
 %       .v2r    voxel-to-realworld transformation
-%       .BlobMatchOnly keep only matching blobs or not [false, default]
+%       .BMO    "blob match only", i.e. keep only matching blobs or not [false, default]
 %
 % OUTPUT
 %   mD          mean distances between surface in images 1-2 and 2-1
@@ -39,7 +39,7 @@ function [mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt)
 
 %%
 % *Check input data*
-opt_def = struct('BlobMatchOnly',false,'v2r',eye(4)); % default options
+opt_def = struct('BMO',false,'v2r',eye(4)); % default options
 
 if nargin == 0
     help crc_imgHaudorffDist
@@ -55,9 +55,9 @@ end
 opt = crc_check_flag(opt_def,opt);
 
 %%
-% Deal with blob overlap if requested
-nDropped = [0 0];
-if opt.BlobMatchOnly
+% Deal with blob overlap, if requested
+nDropped = [];
+if opt.BMO
     [L2,num2] = spm_bwlabel(double(img2),26);
     if num2>1
         [L1,num1] = spm_bwlabel(double(img1),26);
