@@ -85,8 +85,8 @@ end
 
 %%
 % *get border voxels and calculate H-distance*
-[iBx1,iBy1,iBz1] = crc_borderVx(img1);
-[iBx2,iBy2,iBz2] = crc_borderVx(img2);
+[iBx1,iBy1,iBz1] = crc_borderVx(img1,false);
+[iBx2,iBy2,iBz2] = crc_borderVx(img2,false);
 
 % Get coordinates in mm
 Bxyz1_mm = opt.v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];

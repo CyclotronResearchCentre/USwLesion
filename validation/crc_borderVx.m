@@ -1,16 +1,17 @@
-function varargout = crc_borderVx(vol)
+function varargout = crc_borderVx(vol,verbose)
 %
 % Function that returns the list of voxels at the 'border' of clusters in a
 % 3D binary image. A border voxel is any voxel whose 18 direct neighbours
 % are not all surrounded by voxels in that cluster.
 %
 % FORMAT
-%   lBorder = crc_borderVx(vol)
+%   lBorder = crc_borderVx(vol,verbose)
 % or
-%   [lBx,lBy,lBz] = crc_borderVx(vol)
+%   [lBx,lBy,lBz] = crc_borderVx(vol,verbose)
 %
 % INPUT
 %   vol      binary 3D array, voxels with 1's are the clusters
+%   verbose  display some numbers about volume and surface [true, default]
 %
 % OUTPUT
 %   lBorder  list of border voxels
@@ -30,6 +31,8 @@ function varargout = crc_borderVx(vol)
 
 % Written by Christophe Phillips
 % University of Liège, Belgium
+
+if nargin<2, verbose = true; end
 
 %% Get image sizes, define clique, etc.
 vol = vol>0;
@@ -73,8 +76,10 @@ else
     lBorder = [];
 end
 % Number of border voxels:
-fprintf('\nThere are %d surface voxels out of %d/%d voxels in clusters/total.\n', ...
-    length(lBorder), sum(vol(:)), prod(DIM))
+if verbose
+    fprintf('\nThere are %d surface voxels out of %d/%d voxels in clusters/total.\n', ...
+        length(lBorder), sum(vol(:)), prod(DIM))
+end
 
 %% Deal with output
 if nargout==1
