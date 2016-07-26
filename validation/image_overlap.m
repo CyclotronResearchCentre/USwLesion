@@ -52,9 +52,12 @@ function [mJ,mHd,overlap,other] = image_overlap(img1,img2,opt)
 %       .voxel.cm:   confusion matrix [ TP FN ; FP TN ] counts
 %       .voxel.mcc:  Matthews correlation coefficient  (see Ref here under)
 %       .voxel.CK:   Cohen's Kappa
+%       .voxel.vols: volume (mm^3) of the blobs in img1/2 + mask if provided
 %
 %       .cluster.tp: percentage of clusters in img1 roi matching img2
 %       .cluster.fp: percentage of clusters in img1 not matching any in img2
+%       .cluster.counts : 1st row = [#true positives #true clusters]
+%                         2nd row = [#false positives #estimated clusters]
 %
 % REFERENCES:
 % The Jaccard index (1910) is defined as
@@ -169,6 +172,7 @@ if ~isempty(mask) % load/use if not empty
     else
         mask = (mask==0);
     end
+    vMsk_vx = sum(mask(:)==1);
 end
 
 %%
@@ -222,8 +226,8 @@ if nargout >= 3
             % divide by length(find(L2==n)) to get percentage per cluster;
         end
         overlap.cluster.tp = sum(NP>0) / num2;
-        overlap.cluster.cm(1,1) = sum(NP>0); % #true positives
-        overlap.cluster.cm(1,2) = num2;      % #true clusters
+        overlap.cluster.counts(1,1) = sum(NP>0); % #true positives
+        overlap.cluster.counts(1,2) = num2;      % #true clusters
         
         % for each cluster in img1 check if img2 has one too
         NN = zeros(1,num1);
@@ -231,12 +235,12 @@ if nargout >= 3
             NN(n) = length(intersect(find(L1==n),find(img2)));
         end
         overlap.cluster.fp = sum(NN==0) / num1;
-        overlap.cluster.cm(2,1) = sum(NN==0); % #false positives
-        overlap.cluster.cm(2,2) = num1;       % #estimated clusters
+        overlap.cluster.counts(2,1) = sum(NN==0); % #false positives
+        overlap.cluster.counts(2,2) = num1;       % #estimated clusters
     else
         overlap.cluster.tp = [];
         overlap.cluster.fp = [];
-        overlap.cluster.cm = [];
+        overlap.cluster.counts = [];
     end
     
     
@@ -271,6 +275,14 @@ if nargout >= 3
     Po = (TP+TN)/sum(overlap.voxel.cm(:));
     Pr = (TP+TN)*(TP+FP)/sum(overlap.voxel.cm(:))^2;
     overlap.voxel.CK = (Po - Pr)/(1 - Pr);
+    
+    % Voxel count
+    if ~isempty(mask)
+        vol_vx = [sum(vimg1) sum(vimg2) vMsk_vx];
+    else
+        vol_vx = [sum(vimg1) sum(vimg2)];
+    end
+    overlap.voxel.vols = vol_vx*abs(det(v2r)); 
     
 end
 end
