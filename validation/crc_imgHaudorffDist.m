@@ -56,7 +56,7 @@ opt = crc_check_flag(opt_def,opt);
 
 %%
 % Deal with blob overlap, if requested
-nDropped = [];
+nDropped = NaN;
 if opt.BMO
     [L2,num2] = spm_bwlabel(double(img2),26);
     if num2>1
@@ -78,22 +78,29 @@ if opt.BMO
             for ii=find(NoMatch2)
                 img2(L2==ii) = false;
             end
-            nDropped = [sum(NoMatch1) sum(NoMatch2)];
+            nDropped = [sum(NoMatch2) num2-sum(NoMatch2); ...
+                        sum(NoMatch1) num1-sum(NoMatch1)];
+                    % This is actually the same information as contained in
+                    % the overlap.cluster.count field!
         end
     end
 end
 
-%%
-% *get border voxels and calculate H-distance*
-[iBx1,iBy1,iBz1] = crc_borderVx(img1,false);
-[iBx2,iBy2,iBz2] = crc_borderVx(img2,false);
+%% Proceed, if not empty images
+if sum(img1(:)) && sum(img2(:))
+    % *get border voxels and calculate H-distance*
+    [iBx1,iBy1,iBz1] = crc_borderVx(img1,false);
+    [iBx2,iBy2,iBz2] = crc_borderVx(img2,false);
 
-% Get coordinates in mm
-Bxyz1_mm = opt.v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
-Bxyz2_mm = opt.v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
+    % Get coordinates in mm
+    Bxyz1_mm = opt.v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
+    Bxyz2_mm = opt.v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
 
-% Calculate Hausdorff distance
-[mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm); %#ok<*ASGLU>
+    % Calculate Hausdorff distance
+    [mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm); %#ok<*ASGLU>
+else
+    mD = NaN; D12 = NaN; D21 = NaN;
+end
 
 end
 
