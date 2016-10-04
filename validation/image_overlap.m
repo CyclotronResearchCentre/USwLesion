@@ -103,6 +103,7 @@ elseif nargin < 2 || nargin > 3
 end
 % Fill the opt structure with defaults
 opt = crc_check_flag(opt_def,opt);
+mJ = []; mHd = []; overlap = [];
 
 %%
 % * Check fisrt images in*
@@ -191,15 +192,17 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 % *Extract the mean Hausdorff distance*
 
 % Get border coordinates in vx, not considering the mask!
-[iBx1,iBy1,iBz1] = crc_borderVx(img1);
-[iBx2,iBy2,iBz2] = crc_borderVx(img2);
-
-% Get coordinates in mm
-Bxyz1_mm = v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
-Bxyz2_mm = v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
-
-[mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm);
-mHd = mean(mD);
+if nargout >=2
+    [iBx1,iBy1,iBz1] = crc_borderVx(img1);
+    [iBx2,iBy2,iBz2] = crc_borderVx(img2);
+    
+    % Get coordinates in mm
+    Bxyz1_mm = v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
+    Bxyz2_mm = v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
+    
+    [mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm);
+    mHd = mean(mD);
+end
 
 %% Overlap measures to ground truth
 % ----------------------------------
@@ -283,10 +286,10 @@ for move = 1:4
     img1 = zeros(12,12); img2 = img1;
     img1(index1,index1) = 1;
     img2(index2,index2) = 1;
-    overlap = image_overlap(img1,img2);
     subplot(2,2,move); imagesc(img1+img2); drawnow
-    title(['overlap ' num2str(overlap.tp) '% mJ=' num2str(overlap.mJ)])
-    index1 = index1+1;
-    index2 = index2 -1;
+    A = image_overlap(img1,img2);
+    TP = (sum((img1(:)+img2(:))==2)) / sum(img2(:));
+    title(['overlap ' num2str(TP*100) '% mJ=' num2str(A)])
+    index1 = index1+1; index2 = index2 -1;
 end
 end
