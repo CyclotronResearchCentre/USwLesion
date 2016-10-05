@@ -179,35 +179,32 @@ end
 cd(current)
 save tmp_results
 
-run Normalization_analysis
-return
-
 %% check the results
-rst_data_plot([mJ_before' mJ_after' mJ_cont])
-[h,CI,p] = rst_pttest(mJ_after',mJ_before','median')
-[r,t,p,hboot,CI] = skipped_correlation(mJ_before',mJ_after');
-[r,t,p,hboot,CI] = skipped_correlation(mJ_before',mJ_after'-mJ_before');
-
-rst_data_plot([mHD_before' mHD_after' mHD_cont])
-[r,t,p,hboot,CI] = skipped_correlation(mHD_before',mHD_after');
-[r,t,p,hboot,CI] = skipped_correlation(mHD_before',mHD_after'-mHD_before');
-
 % similarity to ground truth
-for i=1:20
+for i=1:30
     Atp(i) = overlap_after(i).voxel.tp;
     Atn(i) = overlap_after(i).voxel.tn;
     Afp(i) = overlap_after(i).voxel.fp;
     Afn(i) = overlap_after(i).voxel.fn;
     Amcc(i) = overlap_after(i).voxel.mcc;
+    ACK(i) = overlap_after(i).voxel.CK;
     Btp(i) = overlap_before(i).voxel.tp;
     Btn(i) = overlap_before(i).voxel.tn;
     Bfp(i) = overlap_before(i).voxel.fp;
     Bfn(i) = overlap_before(i).voxel.fn;
     Bmcc(i) = overlap_before(i).voxel.mcc;
+    BCK(i) = overlap_before(i).voxel.CK;
 end
 
-rst_data_plot([Btp' Atp' Btn' Atn' Bfp' Afp' Bfn' Afn' Bmcc' Amcc'])
-[r,t,p,hboot,CI] = skipped_correlation([Btp' Btn'],[Atp'-Btp' Atn'-Btn']);
+[est_CM,HDI_CM]=rst_data_plot([Btp' Atp' Btn' Atn' Bfp' Afp' Bfn' Afn' ],'estimator','median');
+
+[est_J,HDI_J]=rst_data_plot([mJ_before' mJ_after'],'estimator','median');
+[est_H,HDI_H]=rst_data_plot([mHD_before' mHD_after'],'estimator','median');
+[est_MCC,HDI_MCC]=rst_data_plot([Bmcc' Amcc'],'estimator','median');
+[est_CK,HDI_CK]=rst_data_plot([BCK' ACK'],'estimator','median');
+[httest,CIttest,pttest] = rst_pttest([mJ_after' mHD_after' Amcc' ACK'],[mJ_before' mHD_before' Bmcc' BCK'],'median',1,0.05,10000)
+[r,t,h,outid,hboot,CI] = skipped_correlation([mJ_before' mJ_before' Bmcc' Bmcc'],[mJ_after' mJ_after'-mJ_before' Amcc' Amcc'-Bmcc']);
+
 
 %% analysis of normalized volumes
 % simply compute the mean difference to the template
@@ -219,8 +216,10 @@ bb = [-78  -112   -70; 78    76    86]; vs = [1 1 1];
 spmup_resize(template,bb,vs)
 template = [fileparts(which('spm')) filesep 'canonical' filesep 'ravg152T1.nii'];
 template = spm_read_vols(spm_vol(template));
+template = (template.*100) ./ max(template(:));
 for patient = 1:30
     img = spm_read_vols(spm_vol(cell2mat(normalized_standard{patient})));
+    img = (img.*100) ./ max(img(:));
     dist = (template - img).^2;
     distance(patient,1) = sum(dist(~isnan(dist)))/numel(~isnan(dist));
 end
@@ -230,11 +229,16 @@ bb = [-78 -112 -70; 78 76 85]; vs = [1 1 1];
 spmup_resize(template,bb,vs)
 template = [fileparts(which('spm')) filesep 'canonical' filesep 'ravg152T1.nii'];
 template = spm_read_vols(spm_vol(template));
+template = (template.*100) ./ max(template(:));
 for patient = 1:30
     img = spm_read_vols(spm_vol(cell2mat(normalized_augmented{patient})));
+    img = (img.*100) ./ max(img(:));
     dist = (template - img).^2;
     distance(patient,2) = sum(dist(~isnan(dist)))/numel(~isnan(dist));
 end
+
+[med_dist, CI_distance]= rst_data_plot(distance,'estimator','median');
+[hdist,CIdist,pdist] = rst_pttest(distance(:,1),distance(:,2),'median',1,0.05,10000)
 
 % compute the difference between all pairs - take determinant
 distance_matrix = zeros(30,30,2);
@@ -243,12 +247,14 @@ pairs = nchoosek([1:30],2);
 for n=1:size(pairs,1)
     img1 = spm_read_vols(spm_vol(cell2mat(normalized_standard{pairs(n,1)})));
     img2 = spm_read_vols(spm_vol(cell2mat(normalized_standard{pairs(n,2)})));
+    img1 = (img1.*100) ./ max(img1(:)); img2 = (img2.*100) ./ max(img2(:));
     dist = (img1 - img2).^2;
     distance_matrix(pairs(n,1),pairs(n,2),1) = sum(dist(~isnan(dist)))/numel(~isnan(dist));
     distance_matrix(pairs(n,2),pairs(n,1),1) = distance_matrix(pairs(n,1),pairs(n,2),1);
     
     img1 = spm_read_vols(spm_vol(cell2mat(normalized_augmented{pairs(n,1)})));
     img2 = spm_read_vols(spm_vol(cell2mat(normalized_augmented{pairs(n,2)})));
+    img1 = (img1.*100) ./ max(img1(:)); img2 = (img2.*100) ./ max(img2(:));
     dist = (img1 - img2).^2;
     distance_matrix(pairs(n,1),pairs(n,2),2) = sum(dist(~isnan(dist)))/numel(~isnan(dist));
     distance_matrix(pairs(n,2),pairs(n,1),2) = distance_matrix(pairs(n,1),pairs(n,2),2);
@@ -256,6 +262,11 @@ end
 
 A = triu(distance_matrix(:,:,1)); 
 B = triu(distance_matrix(:,:,2));
-rst_data_plot([A(find(A)),B(find(B))]);
+[med_pdist, CI_pdistance] = rst_data_plot([A(find(A)),B(find(B))],'estimator','median');
+[hpdist,CIpdist,ppdist] = rst_pttest(A(find(A)),B(find(B)),'median',1,0.05,10000)
 [det(distance_matrix(:,:,1)) det(distance_matrix(:,:,2))]
+figure; subplot(1,2,1); imagesc(A); 
+subplot(1,2,2); imagesc(B); colormap(cubehelixmap('semi_continuous',64));
 
+
+run Normalization_analysis
