@@ -192,35 +192,45 @@ for subjects= 1:30
     cd(local(subjects+2).name)
     % load the reference
     Ref = spm_read_vols(spm_vol([pwd filesep 'standard_segmentation' filesep 'wanat.nii']));
+    Ref(isnan(Ref)) = 0;
     % load the standard normalization
     Standard = spm_read_vols(spm_vol([pwd filesep 'segmentation_damagedT1' filesep 'wwdamaged_T1.nii']));
+    Standard(isnan(Standard)) = 0;
     % load the augmented seg/normalization
     Augmented = spm_read_vols(spm_vol([pwd filesep 'wwdamaged_T1.nii']));
+    Augmented(isnan(Augmented)) = 0;
     
     % compute the mean square distance in the healthy tissue only
     % icv from initial anatomical and remove the tumour (all in MNI space)
     icv = spm_read_vols(spm_vol([pwd filesep 'standard_segmentation' filesep 'wc1anat.nii'])) + ...
         spm_read_vols(spm_vol([pwd filesep 'standard_segmentation' filesep 'wc2anat.nii'])) + ...
         spm_read_vols(spm_vol([pwd filesep 'standard_segmentation' filesep 'wc3anat.nii']));
-    mask = (icv>0); 
+    mask = smooth3((icv>0),'box',[3 3 3]); mask = mask>0; 
     
     name = spm_vol(lesion_masks{subjects}{1}.files);
     tumour_mask = logical(spm_read_vols(name{1}));  
     mask(tumour_mask) = 0; % this is brain mask minus tumour
-        
+    figure; for z=1:size(icv,3); imagesc(squeeze(mask(:,:,z)).*5+squeeze(tumour_mask(:,:,z))); pause(0.1); end; close
+    
     % similarity 
-    C = cov(Ref(tumour_mask),Standard(tumour_mask));
+    C = cov(Ref(mask),Standard(mask));
     sim(subjects,1) = ((2*nanmean(Ref(mask))*nanmean(Standard(mask))+100)*(2*C(1,2)+10)) / ...
         (nanmean(Ref(mask))^2+nanmean(Standard(mask))^2+100)*(nanvar(Ref(mask))+nanvar(Standard(mask))+10);
+    
+    C = cov(Ref(mask),Augmented(mask));    
+    sim(subjects,2) = ((2*nanmean(Ref(mask))*nanmean(Augmented(mask))+100)*(2*C(1,2)+10)) / ...
+        (nanmean(Ref(mask))^2+nanmean(Augmented(mask))^2+100)*(nanvar(Ref(mask))+nanvar(Augmented(mask))+10);
+    
+    
+    C = cov(Ref(tumour_mask),Standard(tumour_mask));
     sim(subjects,3) = ((2*nanmean(Ref(tumour_mask))*nanmean(Standard(tumour_mask))+100)*(2*C(1,2)+10)) / ...
         (nanmean(Ref(tumour_mask))^2+nanmean(Standard(tumour_mask))^2+100)*(nanvar(Ref(tumour_mask))+nanvar(Standard(tumour_mask))+10);
-    
-    C = cov(Ref(tumour_mask),Augmented(tumour_mask));
-    sim(subjects,2) = ((2*nanmean(Ref(tumour_mask))*nanmean(Augmented(tumour_mask))+100)*(2*C(1,2)+10)) / ...
-        (nanmean(Ref(tumour_mask))^2+nanmean(Augmented(tumour_mask))^2+100)*(nanvar(Ref(tumour_mask))+nanvar(Augmented(tumour_mask))+10);
-    sim(subjects,4) = ((2*nanmean(Ref(mask))*nanmean(Augmented(mask))+100)*(2*C(1,2)+10)) / ...
-        (nanmean(Ref(mask))^2+nanmean(Augmented(mask))^2+100)*(nanvar(Ref(mask))+nanvar(Augmented(mask))+10);
 
+    C = cov(Ref(tumour_mask),Augmented(tumour_mask));    
+    sim(subjects,4) = ((2*nanmean(Ref(tumour_mask))*nanmean(Augmented(tumour_mask))+100)*(2*C(1,2)+10)) / ...
+        (nanmean(Ref(tumour_mask))^2+nanmean(Augmented(tumour_mask))^2+100)*(nanvar(Ref(tumour_mask))+nanvar(Augmented(tumour_mask))+10);
+
+    
      % intensity based differences
     Ref = (Ref.*100) ./ max(Ref(:));
     Standard = (Standard.*100) ./ max(Standard(:));
@@ -234,8 +244,19 @@ for subjects= 1:30
     cd ..
 end
 
-cd(current); save normalization_results
-    
+cd(current); 
+save normalization_results
+
+%% WARNING SUBJECT 19 EXCLUDED 
+%% HAVEN'T FIGURED WHY BUT VALUES ARE OUTLYING MASSIVELY 
+sim(19,:) = []; distance(19,:) = [];
+[med_sim, CI_sim]= rst_data_plot(sim(:,[1 2]),'estimator','median');
+[med_sim([3 4]), CI_sim(:,[3 4])]= rst_data_plot(sim(:,[3 4]),'estimator','median');
+[hsim,CIsim,psim] = rst_pttest(sim(:,[2 4]),sim(:,[1 3]),'median',1,0.05,10000)
+
+[med_dist, CI_distance]= rst_data_plot(distance(:,[1 2]),'estimator','median');
+[med_dist([3 4]), CI_distance(:,[3 4])]= rst_data_plot(distance(:,[3 4]),'estimator','median');
+[hdist,CIdist,pdist] = rst_pttest(distance(:,[2 4]),distance(:,[1 3]),'median',1,0.05,10000)
     
     
     

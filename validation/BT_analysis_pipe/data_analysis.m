@@ -83,16 +83,16 @@ for tumour_type = 1:2
         
         matlabbatch{1}.spm.spatial.preproc.channel.vols = vols';
         matlabbatch{2}.spm.spatial.normalise.write.subj.resample = {vols{1}};
-        % spm_jobman('run', matlabbatch);
+        spm_jobman('run', matlabbatch);
         
         %cleanup
         cd(fileparts(vols{1}))
-%         local = dir; mkdir('standard_segmentation');
-%         for d=3:size(local,1)
-%             if strncmp(local(d).date,today,11) && local(d).isdir == 0
-%                 movefile(local(d).name,[pwd filesep 'standard_segmentation'])
-%             end
-%         end
+        local = dir; mkdir('standard_segmentation');
+        for d=3:size(local,1)
+            if strncmp(local(d).date,today,11) && local(d).isdir == 0
+                movefile(local(d).name,[pwd filesep 'standard_segmentation'])
+            end
+        end
         
         % 2 segment/normalize image using the augmented unified segmentation
         %--------------------------------------------------------------------
@@ -117,26 +117,26 @@ for tumour_type = 1:2
         if strcmp(folders(patient).name,'brats_2013_pat0005_1') || strcmp(folders(patient).name,'brats_2013_pat0026_1')
             matlabbatch{1}.spm.tools.USwLtools.uswl.options.thrLesion = 10;
         end
-        % spm_jobman('run', matlabbatch);
+        spm_jobman('run', matlabbatch);
         
         
         % cleanup
-%         for folder = 1:2
-%             if folder == 1
-%                 cd(fileparts(opt.mask)) % go into FLAIR dir
-%             else
-%                 cd(fileparts(tumour_mask)) % go into T1 dir
-%                 normalized_augmented{index} = {[pwd filesep 'augmented_segmentation' filesep 'wVSD.nii']};
-%             end
-%             
-%             local = dir;
-%             mkdir('augmented_segmentation')
-%             for d=3:size(local,1)
-%                 if strncmp(local(d).date,today,11) && local(d).isdir == 0
-%                     movefile(local(d).name,[pwd filesep 'augmented_segmentation'])
-%                 end
-%             end
-%         end
+        for folder = 1:2
+            if folder == 1
+                cd(fileparts(opt.mask)) % go into FLAIR dir
+            else
+                cd(fileparts(tumour_mask)) % go into T1 dir
+                normalized_augmented{index} = {[pwd filesep 'augmented_segmentation' filesep 'wVSD.nii']};
+            end
+            
+            local = dir;
+            mkdir('augmented_segmentation')
+            for d=3:size(local,1)
+                if strncmp(local(d).date,today,11) && local(d).isdir == 0
+                    movefile(local(d).name,[pwd filesep 'augmented_segmentation'])
+                end
+            end
+        end
         
         % 3 analyze the masks from the augmented segmentation
         % ---------------------------------------------------
