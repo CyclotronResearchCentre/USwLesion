@@ -46,7 +46,7 @@ end
 % Check #Gaussians and #TPMs for the USwLesion segmentation.
 NbGaussian = job.options.NbGaussian;
 fn_tpm_USwL = job.options.imgTpm{1};
-fn_tpm_USwL = spm_file(fn_tpm_USwL,'number','')
+fn_tpm_USwL = spm_file(fn_tpm_USwL,'number','');
 Vtpm_USwL = spm_vol(fn_tpm_USwL);
 if numel(NbGaussian)~=(numel(Vtpm_USwL)+1)
     error('There are %d tpm (incl. lesion) but only %d #Gaussians provided', ...
