@@ -1,40 +1,74 @@
-function [fn_out,nDropped] = crc_lesion_cleanup(fn_in,k,prefix)
+function [fn_out,nDropped] = crc_lesion_cleanup(fn_in,opt)
 
-% This is a silly routine to cleanup anu binary image based on spatial
-% extent of clsuters. During segmentation some spurious voxels may end up 
-% misclassified. So if we know a clsuter (e.g. lesions) must be at least of
-% a given size, we can use spatial extend to clean up the small clusters.
+% This is a silly routine to cleanup any binary image based 
+% - on eroding/growing operations, and/or
+% - on spatial extent of clusters
+% 
+% During segmentation some spurious voxels may end up misclassified. So if 
+% we know a cluster (e.g. lesions) must be at least of a given size, we can
+% use spatial extend to clean up the small clusters.
+% Similarly it can be useful to erode volumes then grow them to tease out 
+% compact-ish clusters as opposed to 'lines'. Indeed partial volume effect
+% tends to produce very thin, border line/surface clusters.
 %
 % FORMAT 
 % fn_out = lesion_crc_cleanup(fn_in,k,prefix)
 %
 % INPUT 
 % fn_in     : the volume name (typically c3 image, the lesion map)
-% k         : the spatial extent threshold [Inf, def., i.e largest cluster]
-% prefix    : prefix prepended to image name
+% opt       : structure with options
+%   .k        the spatial extent threshold [Inf, def., i.e largest cluster]
+%   .prefix   prefix prepended to image name
+%   .Neg      number of eroding then growing steps [def, [0 0]]
+%   .Nge      number of growing then eroding steps [def, [0 0]]
 %
 % OUTPUT 
 % fn_out    : file name of cleaned image, writen on the disk
 % nDropped  : number of clusters that were dropped out and remaining number
-%             of clusters.
+%             of clusters, after erode/grow.
 % 
+% NOTE:
+% - Eroding-then-growing (EG) or growing-then-eroding (GE)  are of course 
+%   mutually exclusive! If both were set up simultaneously, then EG would
+%   have priority.
+% - the EG/GE operation, if requested, takes place before the cluster size
+%   trimming
 %
 % see also spm_bwlabel
 % Cyril Pernet 30 Oct 2015
 %_______________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
 
-if nargin<2
-    prefix = 'cleaned_';
-end
-if nargin<1
-    k = Inf; % if not specified we keep only the biggest cluster
-end
+%% Sort out input
+if nargin<2, opt = []; end;
+opt_def = struct('k', Inf, 'prefix', 'clean_', ...
+                  'Neg', [], 'Nge', []);
+opt = crc_check_flag(opt_def,opt); % Check and pad filter structure
+
+k = opt.k;
+prefix = opt.prefix;
+Neg = opt.Neg;
+Nge = opt.Nge;
+
 if nargin == 0
     fn_in = spm_select(1,'image','select image to threshold');
 end
 
-% get image in
+if ~isempty(Neg)
+    orderEG = 1;  % -> erode then grow
+    if numel(Neg)~=2 || ~all(Neg>0)
+        error('Wrong number of erode-grow steps.');
+    end
+elseif ~isempty(Nge)
+    orderEG = -1; % -> grow then erode
+    if numel(Nge)~=2 || ~all(Nge>1)
+        error('Wrong number of grow-erode steps.');
+    end
+else
+    orderEG = 0;  % -> no erode/grow operation
+end
+
+%% Get image in
 if iscell(fn_in); fn_in = cell2mat(fn_in); end
 if ischar(fn_in)
     V_in = spm_vol(fn_in);
@@ -44,8 +78,30 @@ else
     data = fn_in;
     save_img = false;
 end
+ddata = double(data>0);
 
-[clustered_map,num] = spm_bwlabel(double(data>0),18);
+%% Deal with erode/grow
+switch orderEG
+    case 1  % -> erode then grow
+        for ii=1:Neg(1) % erode
+            ddata = imerode(~~ddata,ones(3,3,3));
+        end
+        for ii=1:Neg(2) % grow
+            ddata = imdilate(~~ddata,ones(3,3,3));
+        end       
+    case -1 % -> grow then erode
+        for ii=1:Nge(1) % grow
+            ddata = imdilate(~~ddata,ones(3,3,3));
+        end       
+        for ii=1:Nge(2) % erode
+            ddata = imerode(~~ddata,ones(3,3,3));
+        end
+    otherwise
+        % Do nothing. :-)
+end
+
+%% Deal with cluster sizes
+[clustered_map,num] = spm_bwlabel(double(ddata),18);
 % note we use edge connection
 
 % check number of elements per clusters
@@ -77,8 +133,10 @@ else
     nDropped(2) = num-nDropped(1);
 end
 
+%% Deal with output
 extent_map = extent_map .* data; % reasign the initial values
 if save_img
+    V_out = V_in;
     fn_out = spm_file(V_in.fname,'prefix',prefix);
     V_out.fname = fn_out;
     V_out.descrip = [V_out.descrip ' thresholded @ k=' num2str(k)];
