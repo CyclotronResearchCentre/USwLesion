@@ -18,9 +18,10 @@ function [fn_out,nDropped] = crc_lesion_cleanup(fn_in,opt)
 % fn_in     : the volume name (typically c3 image, the lesion map)
 % opt       : structure with options
 %   .k        the spatial extent threshold [Inf, def., i.e largest cluster]
-%   .prefix   prefix prepended to image name
+%   .prefix   prefix prepended to image name [def, 'c']
 %   .Neg      number of eroding then growing steps [def, [0 0]]
 %   .Nge      number of growing then eroding steps [def, [0 0]]
+%   .Nneighb  numbre of neighbours in 3D (6, 18 or 26) [def, 6]
 %
 % OUTPUT 
 % fn_out    : file name of cleaned image, writen on the disk
@@ -41,14 +42,15 @@ function [fn_out,nDropped] = crc_lesion_cleanup(fn_in,opt)
 
 %% Sort out input
 if nargin<2, opt = []; end;
-opt_def = struct('k', Inf, 'prefix', 'clean_', ...
-                  'Neg', [], 'Nge', []);
+opt_def = struct('k', Inf, 'prefix', 'c', ...
+                  'Neg', [], 'Nge', [], 'Nneighb',6);
 opt = crc_check_flag(opt_def,opt); % Check and pad filter structure
 
 k = opt.k;
 prefix = opt.prefix;
 Neg = opt.Neg;
 Nge = opt.Nge;
+Nneighb = opt.Nneighb;
 
 if nargin == 0
     fn_in = spm_select(1,'image','select image to threshold');
@@ -81,20 +83,33 @@ end
 ddata = double(data>0);
 
 %% Deal with erode/grow
+% create neighbourhood
+switch Nneighb
+    case 26 % 26 neighbours, by corner
+        neighb = ones(3,3,3);
+    case 18 % 18 neighbours, by edge
+        neighb = ones(3,3,3);
+        neighb(1,1,1) = 0; neighb(1,1,3) = 0; neighb(1,3,1) = 0; neighb(1,3,3) = 0;
+        neighb(3,1,1) = 0; neighb(3,1,3) = 0; neighb(3,3,1) = 0; neighb(3,3,3) = 0; 
+    otherwise % 6 neighbours, by surface
+        neighb = zeros(3,3,3); 
+        neighb(:,2,2) = 1; neighb(2,:,2) = 1; neighb(2,2,:) = 1;
+end
+
 switch orderEG
     case 1  % -> erode then grow
         for ii=1:Neg(1) % erode
-            ddata = imerode(~~ddata,ones(3,3,3));
+            ddata = imerode(~~ddata,neighb);
         end
         for ii=1:Neg(2) % grow
-            ddata = imdilate(~~ddata,ones(3,3,3));
+            ddata = imdilate(~~ddata,neighb);
         end       
     case -1 % -> grow then erode
         for ii=1:Nge(1) % grow
-            ddata = imdilate(~~ddata,ones(3,3,3));
+            ddata = imdilate(~~ddata,neighb);
         end       
         for ii=1:Nge(2) % erode
-            ddata = imerode(~~ddata,ones(3,3,3));
+            ddata = imerode(~~ddata,neighb);
         end
     otherwise
         % Do nothing. :-)
@@ -109,7 +124,7 @@ extent_map = zeros(size(data));
 clustered_map = clustered_map(:);
 nv = histc(clustered_map,0:num);
 [~,idxall]=sort(clustered_map,'ascend');
-idxall(1:nv(1)) = []; nv(1)=[]; % remove 1st bin ie 0s
+idxall(1:nv(1)) = []; nv(1)=[]; % remove 1st bin, i.e. 0s
 ends = cumsum(nv);
 inis = ends-nv+1;
 

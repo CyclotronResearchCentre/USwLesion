@@ -1,4 +1,4 @@
-function [mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt)
+function [mD,D12,D21,nDropped] = crc_imgHausdorffDist(img1,img2,opt)
 % Calculate the mean Hausdorff distance between the blobs of 2 binary
 % images (img1/2). It works in 2 steps:
 % 1. the coordinates of border voxels of each blobs and image are fist 
