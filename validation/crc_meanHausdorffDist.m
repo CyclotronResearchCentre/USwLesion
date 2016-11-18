@@ -1,4 +1,4 @@
-function [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2)
+function [mD,D12,D21] = crc_meanHausdorffDist(varargin)
 % Calculate the mean Hausdorff distance between 2 surfaces, based on the
 % coordinates of the voxels of these surfaces.
 % This implementation only works with 3D coorinates but is much faster than
@@ -7,11 +7,15 @@ function [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2)
 % the coordinates of border pixels as in 3D.
 %
 % FORMAT
-%   [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2)
+%   [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2,'normalize','true','display','false')
 %
 % INPUT
 %   xyz1/2  coordinates of voxels on borders in both images
 %
+%   normalize is 'true' or 'false' (default)
+%             --> distances are normalized by the max
+%   display is 'true' of 'false'  (default) to show results with histogram
+% 
 % OUTPUT
 %   mD      mean distances between surface in images 1-2 and 2-1
 %   D12/D21 distances between surface in images 1-2 and 2-1
@@ -25,10 +29,44 @@ function [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2)
 
 % Written by Christophe Phillips
 % University of Liege, Belgium
+% updated inputs and normalization C. Pernet , University of Edinburgh
 
-% Switch to true to get some stats and plots generated.
-fl_disp = false;
+%% Set defaults
 
+normalize = false ; % do not normalize
+display = false; % Switch to true to get some stats and plots generated.
+
+%% Check inputs
+if nargin>=2
+    xyz1 = varargin{1};
+    xyz2 = varargin{2};
+else
+    help crc_meanHausdorffDist
+    beep;
+    return
+end
+
+not_recognized = 0;
+if nargin > 2 && rem(nargin,2)==0 % should be even and >2
+    for ii=3:2:nargin
+       if strcmpi(varargin(ii),'normalize')
+           normalize = varargin{ii+1};
+       elseif strcmpi(varargin(ii),'display')
+           display = varargin{ii+1};
+       else
+           not_recognized = 1;
+       end           
+    end
+else
+    not_recognized = 1;
+end
+
+if not_recognized == 1
+    beep;
+    disp('Optional input not recognized, using defaults');
+end
+
+%% Compute
 % Make sure that the coordinates are in N x 3 format
 [xyz1,SZ1,ok1] = check_array(xyz1);
 [xyz2,SZ2,ok2] = check_array(xyz2);
@@ -46,7 +84,11 @@ if ok1 && ok2 % Coordinates are both ok, proceed
         D12(ii) = min(Dtmp); % smallest distance from i_th voxel in 1st image
         D21 = min(D21,Dtmp); % smallest distance for all voxels in 2nd image
     end
-else % some border array must be empty
+    if normalize 
+       D12 = D12 ./ max(D12);
+       D21 = D21 ./ max(D21);
+    end
+else % some border array must be empty, e.g. when no blobs.
     if ok1 && ~ok2
         D12 = zeros(SZ1(1),1)+Inf;
         D21 = NaN;
@@ -61,7 +103,7 @@ end
 mD = [mean(D12) mean(D21)];
 
 % provide some stats and evaluation
-if fl_disp
+if display
     mM = [ min(D12) max(D12) median(D12) ; min(D21) max(D21) median(D12) ]; %#ok<*UNRCH>
     fprintf('\n')
     fprintf('D12 mean/min/max/median: %1.2f / %1.2f / %1.2f / %1.2f',mD(1),mM(1,:))
@@ -87,18 +129,23 @@ end
 
 %% SUBFUNCTIONS
 
-% Make sure that the coordinates are in N x 3 format
-% If the array is empty then ok=false.
 function [xyz,SZ,ok] = check_array(xyz)
+% Make sure that the coordinates xyz are in N x 3 format, flip if
+% necessary. Return the size, N x 3 of the array too.
+% If the array is empty then ok = false.
+
+% get size of input
 SZ = size(xyz);
-ok = false;
+
 if any(SZ==3)
     if SZ(1)<SZ(2)
         xyz = xyz' ;
         SZ = size(xyz);
     end
     ok = true;
-elseif prod(SZ)
+elseif ~prod(SZ) % if array is empty -> prod(size)=0
+    ok = false;
+else
     error('Coordinates should be a 3xN or Nx3 array');
 end
 

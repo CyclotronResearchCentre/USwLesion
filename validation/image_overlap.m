@@ -113,6 +113,7 @@ elseif nargin < 2 || nargin > 3
 end
 % Fill the opt structure with defaults
 opt = crc_check_flag(opt_def,opt);
+mJ = []; mHd = []; overlap = []; %#ok<*NASGU>
 
 %%
 % * Check fisrt images in*
@@ -128,6 +129,8 @@ if ischar(img1)
     else
         error('the file %s doesn''t exist',spm_file(img1,'filename'))
     end
+else
+    v2r = opt.v2r; % Use passed v2r or default one
 end
 
 if ischar(img2)
@@ -202,7 +205,7 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 % *Extract the mean Hausdorff distance*
 opt_HD.v2r = v2r;
 opt_HD.BMO = opt.HDBM;
-[mD,D12,D21,nDropped] = crc_imgHaudorffDist(img1,img2,opt_HD); %#ok<*ASGLU>
+[mD,D12,D21,nDropped] = crc_imgHausdorffDist(img1,img2,opt_HD); %#ok<*ASGLU>
 mHd = mean(mD);
 other.nDropped = nDropped;
 other.mD = mD;
@@ -304,10 +307,11 @@ for move = 1:4
     img1 = zeros(12,12); img2 = img1;
     img1(index1,index1) = 1;
     img2(index2,index2) = 1;
-    overlap = image_overlap(img1,img2);
     subplot(2,2,move); imagesc(img1+img2); drawnow
-    title(['overlap ' num2str(overlap.tp) '% mJ=' num2str(overlap.mJ)])
+    MJ = image_overlap(img1,img2);
+    TP = (sum((img1(:)+img2(:))==2)) / sum(img2(:));
+    title(['overlap ' num2str(TP*100) '% mJ=' num2str(mJ)])
     index1 = index1+1;
-    index2 = index2 -1;
+	index2 = index2-1;
 end
 end
