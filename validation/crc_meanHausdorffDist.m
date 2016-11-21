@@ -1,4 +1,4 @@
-function [mD,D12,D21] = crc_meanHausdorffDist(varargin)
+function [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2,varargin)
 % Calculate the mean Hausdorff distance between 2 surfaces, based on the
 % coordinates of the voxels of these surfaces.
 % This implementation only works with 3D coorinates but is much faster than
@@ -37,18 +37,16 @@ normalize = false ; % do not normalize
 display = false; % Switch to true to get some stats and plots generated.
 
 %% Check inputs
-if nargin>=2
-    xyz1 = varargin{1};
-    xyz2 = varargin{2};
-else
+if nargin<2
     help crc_meanHausdorffDist
     beep;
     return
 end
 
+nVarargs = length(varargin);
 not_recognized = 0;
-if nargin > 2 && rem(nargin,2)==0 % should be even and >2
-    for ii=3:2:nargin
+if nVarargs > 0 && rem(nVarargs,2)==0 % should be even and >2
+    for ii=1:2:nVarargs
        if strcmpi(varargin(ii),'normalize')
            normalize = varargin{ii+1};
        elseif strcmpi(varargin(ii),'display')
