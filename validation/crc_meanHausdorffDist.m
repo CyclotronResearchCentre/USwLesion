@@ -15,7 +15,7 @@ function [mD,D12,D21] = crc_meanHausdorffDist(xyz1,xyz2,varargin)
 %   normalize is 'true' or 'false' (default)
 %             --> distances are normalized by the max
 %   display is 'true' of 'false'  (default) to show results with histogram
-% 
+%
 % OUTPUT
 %   mD      mean distances between surface in images 1-2 and 2-1
 %   D12/D21 distances between surface in images 1-2 and 2-1
@@ -45,18 +45,20 @@ end
 
 nVarargs = length(varargin);
 not_recognized = 0;
-if nVarargs > 0 && rem(nVarargs,2)==0 % should be even and >2
-    for ii=1:2:nVarargs
-       if strcmpi(varargin(ii),'normalize')
-           normalize = varargin{ii+1};
-       elseif strcmpi(varargin(ii),'display')
-           display = varargin{ii+1};
-       else
-           not_recognized = 1;
-       end           
+if nVarargs > 0 % if some varargin
+    if rem(nVarargs,2)==0 % should be even
+        for ii=1:2:nVarargs
+            if strcmpi(varargin(ii),'normalize')
+                normalize = varargin{ii+1};
+            elseif strcmpi(varargin(ii),'display')
+                display = varargin{ii+1};
+            else
+                not_recognized = 1;
+            end
+        end
+    else
+        not_recognized = 1;
     end
-else
-    not_recognized = 1;
 end
 
 if not_recognized == 1
@@ -82,9 +84,9 @@ if ok1 && ok2 % Coordinates are both ok, proceed
         D12(ii) = min(Dtmp); % smallest distance from i_th voxel in 1st image
         D21 = min(D21,Dtmp); % smallest distance for all voxels in 2nd image
     end
-    if normalize 
-       D12 = D12 ./ max(D12);
-       D21 = D21 ./ max(D21);
+    if normalize
+        D12 = D12 ./ max(D12);
+        D21 = D21 ./ max(D21);
     end
 else % some border array must be empty, e.g. when no blobs.
     if ok1 && ~ok2
