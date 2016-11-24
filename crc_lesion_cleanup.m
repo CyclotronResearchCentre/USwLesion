@@ -57,13 +57,13 @@ if nargin == 0
 end
 
 if ~isempty(Neg)
-    orderEG = 1;  % -> erode then grow
-    if numel(Neg)~=2 || ~all(Neg>0)
+    orderEG = 'erode-grow';  % -> erode then grow
+    if numel(Neg)~=2
         error('Wrong number of erode-grow steps.');
     end
 elseif ~isempty(Nge)
-    orderEG = -1; % -> grow then erode
-    if numel(Nge)~=2 || ~all(Nge>1)
+    orderEG = 'grow-erode'; % -> grow then erode
+    if numel(Nge)~=2
         error('Wrong number of grow-erode steps.');
     end
 else
@@ -97,14 +97,14 @@ switch Nneighb
 end
 
 switch orderEG
-    case 1  % -> erode then grow
+    case 'erode-grow'  % -> erode then grow
         for ii=1:Neg(1) % erode
             ddata = imerode(~~ddata,neighb);
         end
         for ii=1:Neg(2) % grow
             ddata = imdilate(~~ddata,neighb);
         end       
-    case -1 % -> grow then erode
+    case 'grow-erode' % -> grow then erode
         for ii=1:Nge(1) % grow
             ddata = imdilate(~~ddata,neighb);
         end       
