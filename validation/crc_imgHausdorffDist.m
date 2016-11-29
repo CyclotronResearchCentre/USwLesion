@@ -59,9 +59,9 @@ opt = crc_check_flag(opt_def,opt);
 nDropped = NaN;
 if opt.BMO
     [L2,num2] = spm_bwlabel(double(img2),26);
-    if num2>1
+    if num2>0
         [L1,num1] = spm_bwlabel(double(img1),26);
-        if num1>1 % Look for blobs not matching and remove them
+        if num1>0 % Look for blobs not matching and remove them
             NoMatch1 = false(1,num1); % \_ No match for blobs in img1/2
             NoMatch2 = false(1,num2); % /
             % Find the not-matching blobs

@@ -84,10 +84,6 @@ if ok1 && ok2 % Coordinates are both ok, proceed
         D12(ii) = min(Dtmp); % smallest distance from i_th voxel in 1st image
         D21 = min(D21,Dtmp); % smallest distance for all voxels in 2nd image
     end
-    if normalize
-        D12 = D12 ./ max(D12);
-        D21 = D21 ./ max(D21);
-    end
 else % some border array must be empty, e.g. when no blobs.
     if ok1 && ~ok2
         D12 = zeros(SZ1(1),1)+Inf;
