@@ -113,7 +113,7 @@ spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
 
-if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs
+if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
     fn_tmp = [];
     for ii=1:nMPM
         fn_MPM_ii = deblank(fn_in{3}(ii,:));
@@ -166,26 +166,26 @@ switch job.options.img4US
     case 0
         fn_Img2segm = fn_in{2}; %#ok<*CCAT1>
     case 1
-        if isempty(fn_in{3}) % if no MPM
-            if ~nOth % and no others
-                fn_Img2segm = char(fn_in{2}); % use struct
-            else
-                fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
-            end
-        else
+%         if isempty(fn_in{3}) % if no MPM
+%             if ~nOth % and no others
+%                 fn_Img2segm = char(fn_in{2}); % use struct
+%             else
+%                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
+%             end
+%         else
             fn_Img2segm = fn_in{3}; % else as requested use MPM only
-        end
+%         end
     case 2
-        % fn_Img2segm = char(fn_in{3} , fn_in{4}); 
-        if isempty(fn_in{3}) % if no MPM 
-            if ~nOth % and no others 
-                fn_Img2segm = char(fn_in{2}); % use struct
-            else
-                fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
-            end
-        else
-            fn_Img2segm = char(fn_in{3} ,fn_in{2},  fn_in{4}); % else as requested use MPM, and all others
-        end
+        fn_Img2segm = char(fn_in{3} , fn_in{4}); 
+%         if isempty(fn_in{3}) % if no MPM 
+%             if ~nOth % and no others 
+%                 fn_Img2segm = char(fn_in{2}); % use struct
+%             else
+%                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
+%             end
+%         else
+%             fn_Img2segm = char(fn_in{3}, fn_in{4}); % else as requested use MPM, and all others
+%         end
 end
 
 opt_segm = struct( ...
