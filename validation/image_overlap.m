@@ -54,10 +54,18 @@ function [mJ,mHd,overlap,other] = image_overlap(img1,img2,opt)
 %       .voxel.CK:   Cohen's Kappa
 %       .voxel.vols: volume (mm^3) of the blobs in img1/2 + mask if provided
 %
-%       .cluster.tp: percentage of clusters in img1 roi matching img2
-%       .cluster.fp: percentage of clusters in img1 not matching any in img2
-%       .cluster.counts : 1st row = [#true positives #true clusters]
-%                         2nd row = [#false positives #estimated clusters]
+%       .cluster.tp: percentage of clusters in img2 (reference) matched by 
+%                    some in img1 (prediction)
+%       .cluster.fp: percentage of clusters in img1 (prediction) not 
+%                    matching any in img2 (reference)
+%       .cluster.counts : 
+%               1st row = [#matches in reference #true clusters]
+%               2nd row = [#false positives in prediction #estimated clusters]
+%       .cluster.Nvx1/2 : number of voxels in each cluster in img1/2
+%       .cluster.NP : for each cluster in img2, number of voxels matching
+%                       some cluster in img1
+%       .cluster.NN : for each cluster in img1, number of voxels matching
+%                       some cluster in img2
 %
 % REFERENCES:
 % The Jaccard index (1910) is defined as
@@ -219,27 +227,35 @@ if nargout >= 3
     % *Compute percentage of overalp at the cluster level*
     
     [L2,num2] = spm_bwlabel(double(img2),26);
-    if num2 >1
+    if num2 >0
         [L1,num1] = spm_bwlabel(double(img1),26);
         
         % for each cluster in img2 check if img1 has one too
         NP = zeros(1,num2);
+        Nvx2 = zeros(1,num2);
         for n=1:num2
             NP(n) = length(intersect(find(img1),find(L2==n)));
             % divide by length(find(L2==n)) to get percentage per cluster;
+            Nvx2(n) = numel(find(L2==n));
         end
         overlap.cluster.tp = sum(NP>0) / num2;
         overlap.cluster.counts(1,1) = sum(NP>0); % #true positives
         overlap.cluster.counts(1,2) = num2;      % #true clusters
+        overlap.cluster.Nvx2 = Nvx2;
+        overlap.cluster.NP = NP;
         
         % for each cluster in img1 check if img2 has one too
         NN = zeros(1,num1);
+        Nvx1 = zeros(1,num1);
         for n=1:num1
             NN(n) = length(intersect(find(L1==n),find(img2)));
+            Nvx1(n) = numel(find(L1==n));
         end
         overlap.cluster.fp = sum(NN==0) / num1;
         overlap.cluster.counts(2,1) = sum(NN==0); % #false positives
         overlap.cluster.counts(2,2) = num1;       % #estimated clusters
+        overlap.cluster.Nvx1 = Nvx1;
+        overlap.cluster.NN = NN;
     else
         overlap.cluster.tp = [];
         overlap.cluster.fp = [];
