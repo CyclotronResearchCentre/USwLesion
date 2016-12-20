@@ -315,15 +315,17 @@ end
 function fn_out = fix_MPMintens(fn_in,thrMPM)
 % Make sure that MPM intensities are within [0 thrMPM] by capping the
 % values. The resulting image is written out with the prefix 't'.
-% On top, create a binary mask of voxels that were "fixed", with a value
+% On top, create an info-image of voxels that were "fixed", with a value
 % of 1 if the voxel value was <0, or 2 if >thrMPM.
 
 crt_mask = true;
 
+% Load stuff
 V = spm_vol(fn_in);
 dd = spm_read_vols(V);
 sz_dd = size(dd); dd = dd(:);
 
+% Generation info-image
 if crt_mask
     ll_fix = (dd<0) + (dd>thrMPM)*2;
     Vf = V;
@@ -334,11 +336,35 @@ if crt_mask
     Vf = spm_write_vol(Vf,reshape(ll_fix,sz_dd));
 end
 
+% Fix the image for the extreme values, <0 and >thr
 dd = abs(dd);
 NaboveThr = sum(dd>thrMPM);
 dd(dd>thrMPM) = thrMPM * (1 + randn(NaboveThr,1)*1e-3);
-
 dd = reshape(dd,sz_dd);
+
+% Fix for the small zero patches in some images:
+% Principle
+% do not worry about superlarge chunk of zero as this is outside the head.
+% replace the zero's by the mean value of at least 9 non-zeros neighbours
+% or 
+% start with the smaller cluster then iterate till everything is filled up.
+sz_thr = 1000; % arbitrary maximum size of patch to fix
+[L,num] = spm_bwlabel(double(~dd),18);
+any_fix = false;
+n_vx = zeros(num,1);
+for ii=1:num
+    n_vx(ii) = sum(L(:)==ii);
+end
+
+[sn_vx,i_cl] = sort(n_vx);
+li_cl(sn_vx>sz_thr) = [];
+sn_vx(sn_vx>sz_thr) = [];
+
+for i_cl = li_cl
+    dd = fix_ith_hole(i_cl,L,dd);
+end
+
+% Save results
 Vc = V;
 Vc.fname = spm_file(V.fname,'prefix','t');
 Vc = spm_create_vol(Vc);
@@ -895,4 +921,19 @@ if any_fix % Need to save something
 %     V_icv.private.dat = v_icv;
     spm_write_vol(V_icv,v_icv);
 end
+end
+
+%% FIXING the MPM maps for there holes (zero's) in the ICV volume
+function dd = fix_ith_hole(i_cl,L,dd)
+% use the image erode/grow to work from the outside in, propagating a "mean
+% value" of the outer values.
+
+nvx = sum(L(:)==i_cl);
+if nvx==1
+    % easy case of isolated voxel
+else
+    % deal with other cases
+end
+
+
 end
