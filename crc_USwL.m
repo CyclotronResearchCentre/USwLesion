@@ -365,6 +365,17 @@ end
 % 1) Load things
 V = spm_vol(P_in);
 [Msk,XYZ] = spm_read_vols(V);
+
+% Ensures values are [0 1], in case scaling was wrong, e.g. [0 255], or 
+% there are some tiny negative values, e.g. if mask was resampled 
+if max(Msk(:))>1 || min(Msk(:))<0
+    fprintf('WARNING: some bad values in the lesion mask!\n')
+    fprintf('\tValue range : [%1.4f %1.4f] -> Setting it to [0 1]\n', ...
+        min(Msk(:)), max(Msk(:)))
+    Msk(Msk>1e-6) = 1; % non-zero values, as in >1e-6, set to 1
+    Msk(Msk<0) = 0; % anything below zero set to zero.
+end
+
 XYZvx = V.mat\[XYZ ; ones(1,size(XYZ,2))];
 vx_vol = abs(det(V.mat(1:3,1:3)));
 minNr = minVol/vx_vol;
