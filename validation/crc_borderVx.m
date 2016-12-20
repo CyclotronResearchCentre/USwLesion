@@ -11,7 +11,7 @@ function varargout = crc_borderVx(vol,verbose)
 %
 % INPUT
 %   vol      binary 3D array, voxels with 1's are the clusters
-%   verbose  display some numbers about volume and surface [true, default]
+%   verbose  display some numbers about volume and surface [Def., true]
 %
 % OUTPUT
 %   lBorder  list of border voxels
