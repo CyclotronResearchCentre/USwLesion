@@ -612,7 +612,7 @@ if max(tpm_l(:))>1 || min(tpm_l(:))<0
     fprintf('WARNING: some bad values in the lesion mask!\n')
     fprintf('\tValue range : [%1.4f %1.4f] -> Setting it to [0 1]\n', ...
         min(tpm_l(:)), max(tpm_l(:)))
-    tpm_l(tpm_l>1e-6) = 1; % non-zero values, as in >1e-6, set to 1
+    tpm_l = tpm_l/max(tpm_l(:)); % rescale to 1
     tpm_l(tpm_l<0) = 0; % anything below zero set to zero.
 end
 
