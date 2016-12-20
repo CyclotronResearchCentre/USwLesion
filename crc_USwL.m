@@ -113,6 +113,11 @@ spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
 
+% Fix the ICV
+% Sometimes there are small holes in the ICV, from poor 1st US -> fill them
+fix_ICV(fn_ICV)
+
+% Apply the mask
 if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
     fn_tmp = [];
     for ii=1:nMPM
@@ -867,4 +872,27 @@ Vo = spm_vol(fn_out);
 fl.dtype = dtype;
 Vo = spm_imcalc(Vi, Vo, 'i1+i2' ,fl);
 
+end
+
+%% FIXING the ICV by filling small holes
+function fix_ICV(fn_ICV)
+V_icv = spm_vol(fn_ICV);
+v_icv = spm_read_vols(V_icv);
+
+sz_thr = 1000; % arbitrary number of voxels for a regular hole in the ICV
+
+[L,num] = spm_bwlabel(double(~v_icv),18);
+any_fix = false;
+for ii=1:num
+    n_vx = sum(L(:)==ii);
+    if n_vx<=sz_thr % if not too big, fix it
+        v_icv(L(:)==ii) = 1;
+        any_fix = true;
+    end
+end
+
+if any_fix % Need to save something
+%     V_icv.private.dat = v_icv;
+    spm_write_vol(V_icv,v_icv);
+end
 end
