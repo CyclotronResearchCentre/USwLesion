@@ -218,17 +218,28 @@ end
 fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
 % Apply on all images: strucural + MPM + others
 if isempty(fn_in{3})
-    fn_img2warp = {char(fn_in{2} , fn_in{4})};
+%     fn_img2warp = {char(fn_in{2} , fn_in{4})};
+    fn_img2warp = {fn_in{4}};
 else
-    fn_img2warp = {char(fn_in{2} ,fn_in{3} , fn_in{4})};
+%     fn_img2warp = {char(fn_in{2} ,fn_in{3} , fn_in{4})};
+    fn_img2warp = {char(fn_in{3} , fn_in{4})};
 end
 clear matlabbatch
+
+if job.options.biaswr(2) % bias image corrected image screated
+    fn_img2warp = {spm_file(fn_img2warp{1},'prefix','m')};
+end
+
 [matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp);
 spm_jobman('run', matlabbatch);
 
 fn_warped_struct = spm_file(fn_in{2},'prefix','w');
 fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
-fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
+if ~isempty(fn_in{4})
+    fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
+else
+    fn_warped_Oth = '';
+end
 % fn_mwTC = char( ...
 %     spm_file(fn_in{3}(1,:),'prefix','smwc1'), ...
 %     spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
@@ -583,6 +594,17 @@ end
 % load smooth lesion mask = tentative lesion tpm
 Vl = spm_vol(fn_swtMsk);
 tpm_l = spm_read_vols(Vl);
+
+% Ensures values are [0 1], in case scaling was wrong, e.g. [0 255], or 
+% there are some tiny negative values, e.g. if mask was resampled 
+if max(tpm_l(:))>1 || min(tpm_l(:))<0
+    fprintf('WARNING: some bad values in the lesion mask!\n')
+    fprintf('\tValue range : [%1.4f %1.4f] -> Setting it to [0 1]\n', ...
+        min(tpm_l(:)), max(tpm_l(:)))
+    tpm_l(tpm_l>1e-6) = 1; % non-zero values, as in >1e-6, set to 1
+    tpm_l(tpm_l<0) = 0; % anything below zero set to zero.
+end
+
 % define where lesion could also be as smoothed version of msk_les_possible
 prob_l_possible = uint8(zeros(size(msk_les_possible)));
 fwhm = 4./sqrt(sum(Vtpm(1).mat(1:3,1:3).^2)); % 4mm expressed in voxels
