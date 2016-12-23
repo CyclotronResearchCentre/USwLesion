@@ -57,8 +57,8 @@ end
 opt = crc_USwL_get_defaults('uTPM');
 
 %% 0. Clean up of the MPM images!
-% Need to know the order of the images, ideally MT, A, R1, R2 and should
-% check with their filename? based on '_MT', '_A', '_R1', '_R2'?
+% Need to know the order of the images, ideally MT, A, R1, R2s and should
+% check with their filename? based on '_MT', '_A', '_R1', '_R2s'?
 fn_in_3_orig = fn_in{3};
 if job.options.thrMPM && nMPM ~= 0
     strMPM = crc_USwL_get_defaults('tMPM.strMPM');
@@ -80,11 +80,21 @@ if job.options.thrMPM && nMPM ~= 0
             fn_tmp = char( fn_tmp , deblank(fn_in{3}(ii,:)));
         end
     end
+    
+    % Check if reference structural is one of the MPMs 
+    % -> if match, use the fixed version!
+    is_StrucRef_MPM = strcmp(fn_in{2}, cellstr(fn_in{3}));
+    
+    % Update the filenames with fixed MPMs
     fn_in{3} = fn_tmp(2:end,:);
+    if any(is_StrucRef_MPM)
+        fn_in{2} = fn_in{3}(find(is_StrucRef_MPM),:);
+    end
+    
 end
 
 %% 1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
-% - remov the "small" lesion patches using a simple criteria: volume of 
+% - remov the "small" lesion patches using a simple criteria: volume of
 %   lesion patch must be > minVol -> creates on the drive t_Msk
 % - then grow volume by nDilate voxel(s) -> creates on the drive dt_Msk
 [fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minVol,opt.nDilate);
@@ -165,32 +175,32 @@ fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk); % that creates the new tis
 
 % the segmentation options are changed for the nb of gaussians + because we
 % have now lesions we increase the clean up (Markov = 2) but set cleanup to
-% none 
+% none
 
 switch job.options.img4US
     case 0
         fn_Img2segm = fn_in{2}; %#ok<*CCAT1>
     case 1
-%         if isempty(fn_in{3}) % if no MPM
-%             if ~nOth % and no others
-%                 fn_Img2segm = char(fn_in{2}); % use struct
-%             else
-%                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
-%             end
-%         else
-            fn_Img2segm = fn_in{3}; % else as requested use MPM only
-%         end
+        %         if isempty(fn_in{3}) % if no MPM
+        %             if ~nOth % and no others
+        %                 fn_Img2segm = char(fn_in{2}); % use struct
+        %             else
+        %                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
+        %             end
+        %         else
+        fn_Img2segm = fn_in{3}; % else as requested use MPM only
+        %         end
     case 2
-        fn_Img2segm = char(fn_in{3} , fn_in{4}); 
-%         if isempty(fn_in{3}) % if no MPM 
-%             if ~nOth % and no others 
-%                 fn_Img2segm = char(fn_in{2}); % use struct
-%             else
-%                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
-%             end
-%         else
-%             fn_Img2segm = char(fn_in{3}, fn_in{4}); % else as requested use MPM, and all others
-%         end
+        fn_Img2segm = char(fn_in{3} , fn_in{4});
+        %         if isempty(fn_in{3}) % if no MPM
+        %             if ~nOth % and no others
+        %                 fn_Img2segm = char(fn_in{2}); % use struct
+        %             else
+        %                 fn_Img2segm = char(fn_in{2}, fn_in{4}); % otherwise use struct and others
+        %             end
+        %         else
+        %             fn_Img2segm = char(fn_in{3}, fn_in{4}); % else as requested use MPM, and all others
+        %         end
 end
 
 opt_segm = struct( ...
@@ -198,7 +208,7 @@ opt_segm = struct( ...
     'b_write', job.options.biaswr, ...
     'nGauss', NbGaussian, ...
     'mrf', job.options.mrf, ...
-    'cleanup', job.options.cleanup); 
+    'cleanup', job.options.cleanup);
 
 clear matlabbatch
 [matlabbatch] = batch_segment_l(fn_Img2segm, fn_TPMl, opt_segm);
@@ -223,10 +233,10 @@ end
 fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
 % Apply on all images: strucural + MPM + others
 if isempty(fn_in{3})
-%     fn_img2warp = {char(fn_in{2} , fn_in{4})};
+    %     fn_img2warp = {char(fn_in{2} , fn_in{4})};
     fn_img2warp = {fn_in{4}};
 else
-%     fn_img2warp = {char(fn_in{2} ,fn_in{3} , fn_in{4})};
+    %     fn_img2warp = {char(fn_in{2} ,fn_in{3} , fn_in{4})};
     fn_img2warp = {char(fn_in{3} , fn_in{4})};
 end
 clear matlabbatch
@@ -342,26 +352,30 @@ NaboveThr = sum(dd>thrMPM);
 dd(dd>thrMPM) = thrMPM * (1 + randn(NaboveThr,1)*1e-3);
 dd = reshape(dd,sz_dd);
 
-% Fix for the small zero patches in some images:
-% Principle
-% do not worry about superlarge chunk of zero as this is outside the head.
-% replace the zero's by the mean value of at least 9 non-zeros neighbours
-% or 
-% start with the smaller cluster then iterate till everything is filled up.
-sz_thr = 1000; % arbitrary maximum size of patch to fix
-[L,num] = spm_bwlabel(double(~dd),18);
-any_fix = false;
-n_vx = zeros(num,1);
-for ii=1:num
-    n_vx(ii) = sum(L(:)==ii);
-end
-
-[sn_vx,i_cl] = sort(n_vx);
-li_cl(sn_vx>sz_thr) = [];
-sn_vx(sn_vx>sz_thr) = [];
-
-for i_cl = li_cl
-    dd = fix_ith_hole(i_cl,L,dd);
+if any(dd(:)==0)
+    % Fix for the small zero patches in some images:
+    % Principle
+    % do not worry about superlarge chunk of zero as this is outside the head.
+    % replace the zero's by the mean value of at least 9 non-zeros neighbours
+    % or
+    % start with the smaller cluster then iterate till everything is filled up.
+    sz_thr = 1000; % arbitrary maximum size of patch to fix
+    [L,num] = spm_bwlabel(double(~dd),18);
+    any_fix = false;
+    n_vx = zeros(num,1);
+    for ii=1:num
+        n_vx(ii) = sum(L(:)==ii);
+    end
+    
+    [sn_vx,li_cl] = sort(n_vx);
+    li_cl(sn_vx>sz_thr) = [];
+    sn_vx(sn_vx>sz_thr) = [];
+    
+    if ~isempty(li_cl)
+        for i_cl = li_cl'
+            dd = fix_ith_hole(i_cl,L,dd);
+        end
+    end
 end
 
 % Save results
@@ -377,10 +391,10 @@ end
 %% STEP 1: Removing small lesion patches from mask
 function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minVol,nDilate)
 % 1) Trim a mask image by removing bits that would be to small to really
-%    matter according to medical criteria 
+%    matter according to medical criteria
 %   For example cf. E. Lommers and MS patients:
 %    "Lesions will ordinarily be larger than 3 mm in cross section"
-%    A cube of 2x2x2 mm^3 has a diagonal of sqrt(12)~3.4mm and 
+%    A cube of 2x2x2 mm^3 has a diagonal of sqrt(12)~3.4mm and
 %    and a volume of 8 mm^3 -> minVol = 8 [DEF]
 %   -> fn_tMsk used for the new TPM_ms
 % 2) Then grow the volume by nDilate voxels [2, DEF]
@@ -397,8 +411,8 @@ end
 V = spm_vol(P_in);
 [Msk,XYZ] = spm_read_vols(V);
 
-% Ensures values are [0 1], in case scaling was wrong, e.g. [0 255], or 
-% there are some tiny negative values, e.g. if mask was resampled 
+% Ensures values are [0 1], in case scaling was wrong, e.g. [0 255], or
+% there are some tiny negative values, e.g. if mask was resampled
 if max(Msk(:))>1 || min(Msk(:))<0
     fprintf('WARNING: some bad values in the lesion mask!\n')
     fprintf('\tValue range : [%1.4f %1.4f] -> Setting it to [0 1]\n', ...
@@ -503,8 +517,8 @@ for ii=1:6
     matlabbatch{3}.spm.spatial.preproc.tissue(ii).native = opt_native(ii,:);
     matlabbatch{3}.spm.spatial.preproc.tissue(ii).warped = [0 0];
 end
-matlabbatch{3}.spm.spatial.preproc.warp.mrf = segm_def.mrf; 
-matlabbatch{3}.spm.spatial.preproc.warp.cleanup = segm_def.cleanup; %% the cleanup is ad-hoc by default leave 1 
+matlabbatch{3}.spm.spatial.preproc.warp.mrf = segm_def.mrf;
+matlabbatch{3}.spm.spatial.preproc.warp.cleanup = segm_def.cleanup; %% the cleanup is ad-hoc by default leave 1
 matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
 matlabbatch{3}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{3}.spm.spatial.preproc.warp.fwhm = 0;
@@ -514,7 +528,7 @@ matlabbatch{4}.spm.spatial.normalise.write.subj.def(1) = cfg_dep('Segment: Forwa
 matlabbatch{4}.spm.spatial.normalise.write.subj.resample(1) = cfg_dep('Named File Selector: LesionMask(1) - Files', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{1}));
 matlabbatch{4}.spm.spatial.normalise.write.woptions.bb = [-90 -126 -72 ; 90 90 108];
 matlabbatch{4}.spm.spatial.normalise.write.woptions.vox = [1.5 1.5 1.5];
-matlabbatch{4}.spm.spatial.normalise.write.woptions.interp = 4;
+matlabbatch{4}.spm.spatial.normalise.write.woptions.interp = 1; % Only trilinear interpolation
 matlabbatch{5}.spm.spatial.smooth.data(1) = cfg_dep('Normalise: Write: Normalised Images (Subj 1)', substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('()',{1}, '.','files'));
 matlabbatch{5}.spm.spatial.smooth.fwhm = smoKern*[1 1 1];
 matlabbatch{5}.spm.spatial.smooth.dtype = 16;
@@ -570,7 +584,7 @@ fn_ICV = fullfile(pth_img,fn_ICV);
 end
 
 %% STEP 4: Updating the TPM with an extra class, the lesion
-% Note that in the resulting TPM the lesion is inserted in *3rd position*, 
+% Note that in the resulting TPM the lesion is inserted in *3rd position*,
 % i.e. between WM and CSF!
 function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 % fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
@@ -613,14 +627,14 @@ else
     tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
 end
 
-% Read in the healthy tissue prob map 
+% Read in the healthy tissue prob map
 % + define some masks for where lesion could also be and ICV area
 msk_ICV = tpm_WM>=opt.min_tpm_icv;
 switch opt.tpm4lesion
     case 0 % GM only
         tpm_healthy = tpm_GM;
         msk_les_possible = (tpm_GM>=tpm_WM) & (tpm_GM>=tpm_CSF);
-
+        
     case 1 % WM only
         tpm_healthy = tpm_WM;
         msk_les_possible = (tpm_WM>=tpm_GM) & (tpm_WM>=tpm_CSF);
@@ -637,10 +651,10 @@ end
 Vl = spm_vol(fn_swtMsk);
 tpm_l = spm_read_vols(Vl);
 
-% Ensures values are [0 1], in case scaling was wrong, e.g. [0 255], or 
-% there are some tiny negative values, e.g. if mask was resampled 
+% Ensures values are [0 1], in case scaling was wrong, e.g. [0 255], or
+% there are some tiny negative values, e.g. if mask was resampled
 if max(tpm_l(:))>1 || min(tpm_l(:))<0
-    fprintf('WARNING: some bad values in the lesion mask!\n')
+    fprintf('WARNING: some bad values in the lesion prior map!\n')
     fprintf('\tValue range : [%1.4f %1.4f] -> Setting it to [0 1]\n', ...
         min(tpm_l(:)), max(tpm_l(:)))
     tpm_l = tpm_l/max(tpm_l(:)); % rescale to 1
@@ -732,7 +746,7 @@ switch opt.tpm4lesion % update healthy tissue classes
             tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
             tpm_ext(:,:,:,2) = tpm_WMu; % update WM
             tpm_ext(:,:,:,3) = tpm_CSFu; % update CSF
-       end
+        end
     otherwise
         error('Wrong tissue flag');
 end
@@ -751,7 +765,7 @@ if isfield(opt,'fn_swICV');
     end
 end
 
- % Update 'other', which is in 6th position of original tpm
+% Update 'other', which is in 6th position of original tpm
 tpm_ext(:,:,:,6) = 1 - sum(tpm_ext(:,:,:,ltpm),4);
 
 % 4) save the TPMl, with lesion between WM & CSF, in subject's data dir.
@@ -900,13 +914,13 @@ Vo = spm_imcalc(Vi, Vo, 'i1+i2' ,fl);
 
 end
 
-%% FIXING the ICV by filling small holes
+%% FIXING the ICV by filling small holes & removing big blobs outside brain
 function fix_ICV(fn_ICV)
 V_icv = spm_vol(fn_ICV);
 v_icv = spm_read_vols(V_icv);
 
+% Deal with small holes
 sz_thr = 1000; % arbitrary number of voxels for a regular hole in the ICV
-
 [L,num] = spm_bwlabel(double(~v_icv),18);
 any_fix = false;
 for ii=1:num
@@ -917,8 +931,22 @@ for ii=1:num
     end
 end
 
+% remove big blobs outside brain volume
+[L,num] = spm_bwlabel(v_icv);
+for ii=1:num
+    n_vx = sum(L(:)==ii);
+end
+
+if numel(n_vx)>1
+    [sn_vx,s_ind] = sort(n_vx);
+    for ii = s_ind(1:end-1) % clear all but the biggest
+        v_icv(L==ii) = 0;
+    end
+    any_fix = true;
+end
+
 if any_fix % Need to save something
-%     V_icv.private.dat = v_icv;
+    %     V_icv.private.dat = v_icv;
     spm_write_vol(V_icv,v_icv);
 end
 end
@@ -927,6 +955,10 @@ end
 function dd = fix_ith_hole(i_cl,L,dd)
 % use the image erode/grow to work from the outside in, propagating a "mean
 % value" of the outer values.
+
+if numel(i_cl)~=1
+    aa=1;
+end
 
 nvx = sum(L(:)==i_cl);
 if nvx==1

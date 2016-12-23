@@ -42,7 +42,7 @@ uswl_def.segment.thrLesion  = 0;
 uswl_def.segment.mrf        = 2;
 uswl_def.segment.cleanup    = 1;
 
-% Parameters for the segmentation of masked anatomican reference (to build
+% Parameters for the segmentation of masked anatomical reference (to build
 % the updated TPM)
 %==========================================================================
 uswl_def.msksegm.imgTpm     = {fullfile(spm('dir'),'tpm','TPM.nii')};
