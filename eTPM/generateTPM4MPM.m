@@ -1,40 +1,49 @@
 %% Script to generate some MPM specific TPM
 %
 % WHY:
-% From some data check with several (elderly) subjects, the pallidum shows 
-% very different voxel intensities from those of the rest of the GM (due to
-% iron deposit with age). This is particularly visible in the A (much 
-% darker voxels) and R2s (much brighter voxels) images. There is no obvious
-% difference in the R1 neither MT imges.
+% From some data check with several (elderly) subjects, the pallidum 
+% surrounding shows very different voxel intensities from those of the rest
+% of the GM (due to % iron deposit with age). This is particularly visible 
+% in the A (much darker voxels) and R2s (much brighter voxels) images. 
+% There is no obvious difference in the R1 neither MT imges.
 % This change in intensities is most probably linked to normal ageing as
-% observed in the Calaghan et al., 2014, paper. This seems to be the main
+% observed in the Callaghan et al., 2014, paper. This seems to be the main
 % reason why segmentation is usually performed on a MT image as the
 % intensities do not seem to be (too affected) by ageing...
 % In practice though, when attempting a multi-channel segmentation (with 
 % lesion or not), i.e. using the 4 images (R1/MT/A/R2s) for segmentation,
-% then segmentation will *fail* for the pallidum area. Those voxel end up
+% then segmentation will *fail* for the "pallidum area". Those voxel end up
 % being classified as skin or anything but GM.
+% In practice Callaghan et al. report the following areas to be affected by
+% ageing in term of R2* values: pallidum, caudate, and putamen. This
+% approximately covers the basal ganglia (BG) area.
 % 
 % HOW:
 % One solution is to improve the unified-segmentation (US) model. In this 
-% case, one could include a specific tissue class for the pallidum in order
-% to catch its very specific image intensities. Given the US flexibility at
+% case, one could include a specific tissue class for the BG in order to 
+% catch its very specific image intensities. Given the US flexibility at
 % handling several channels and tissue classes, that should work smoothly.
 % The only requirement is to update the TPM with a new prior tissue class 
-% (for the pallidum) and to update the other priors, moslty the GM one.
+% (for the BG area ) and to update the other priors, moslty the GM one.
 % There is one atlas distributed with SPM12, let's use it!
+% 
 % In practice this messes up a bit the general flow of images as the GM is
 % now "split" into 2 different images. Moreover some part of code are
 % hard-coded with the first 3 segmented images to be GM-WM-CSF. One way out
-% of this is to include the pallidum class at the end (7th position), then
-% after the segmentation c1 (GM minus pallidum) and c7 (pallidum only) 
-% images can be added together to produce a "new" c1 image with the full 
-% GM posterior probability map.
+% of this is to include the BG class at the end (7th position), then after 
+% the segmentation c1 (GM minus pallidum) and c7 (pallidum only) images can
+% be added together to produce a "new" c1 image with the full GM posterior 
+% probability map.
 % 
 % NOTE:
 % The same kind of problem occurs when a lesion class is introduced between
 % the WM and CSF, so it is important to check any SPM code dealing with
 % segmented tissue classes (e.g. cleaning!)
+% 
+% REFERENCE:
+% Callaghan et al, 2014, Widespread age-related differences in the human 
+% brain microstructure revealed by quantitative magnetic resonance imaging.
+% Neurobiology of Aging, 35:1862-1872
 %_______________________________________________________________________
 % Copyright (C) 2017 Cyclotron Research Centre
 
@@ -42,12 +51,12 @@
 % Cyclotron Research Centre, University of Liege, Belgium
 
 %% DEFINE a few filenames
-fn_TPM = 'unwTPM_sl2.nii';
+fn_TPM = 'eTPM.nii';
 fn_atlas = 'labels_Neuromorphometrics.nii';
-fn_pallidum = 'b_pallidum.nii';
+fn_bg = 'msk_basalganglia.nii';
 dr_TPM = fullfile(spm('dir'),'tpm');
-dr_SB = fullfile(spm('dir'),'toolbox','USwLesion','Script_and_batches');
-mask_smoothing = 4; % smoothing (in mm of FWHM) for the pallidum mask
+dr_TPMuswl = fullfile(spm_file(which('tbx_cfg_USwLesion.m'),'path'),'eTPM');
+mask_smoothing = 4; % smoothing (in mm of FWHM) for the BG mask
 
 %% GET TPMs
 fn_TPMs = spm_select('ExtFPList',dr_TPM,fn_TPM,1:10);
@@ -67,20 +76,30 @@ val_tpm = reshape(vv',SZ);
 % sum(sum(vv)>1)
 
 %% EXTRACT Pallidum from atlas, binarized and smoothed (4mm FWHM)
+% List of L/R regions and coresponding indexes in the atlas from SPM12
+% - pallidum, #55 and #56
+% - caudate, #36 and #37
+% - putamen, #57 and #58
+% - nucleaus aaccumen, #23 and #30
+l_rois = [55 56 36 37 57 58 23 30];
+% Build function for imcalc function.
+func_imcalc = sprintf('(i1==%d)',l_rois(1));
+for ii=2:numel(l_rois)
+    func_imcalc = [func_imcalc, sprintf(' + (i1==%d)',l_rois(ii))]; %#ok<*AGROW>
+end
 
-% The L/R pallidum are coded as #55 and #56 in the atlas
 clear matlabbatch
 matlabbatch{1}.spm.util.imcalc.input = {fullfile(dr_TPM,fn_atlas)};
-matlabbatch{1}.spm.util.imcalc.output = fn_pallidum;
-matlabbatch{1}.spm.util.imcalc.outdir = {dr_SB};
-matlabbatch{1}.spm.util.imcalc.expression = '(i1==55) + (i1==56)';
+matlabbatch{1}.spm.util.imcalc.output = fn_bg;
+matlabbatch{1}.spm.util.imcalc.outdir = {dr_TPMuswl};
+matlabbatch{1}.spm.util.imcalc.expression = func_imcalc;
 matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
 matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
 matlabbatch{1}.spm.util.imcalc.options.mask = 0;
 matlabbatch{1}.spm.util.imcalc.options.interp = 1;
 matlabbatch{1}.spm.util.imcalc.options.dtype = 2;
 matlabbatch{2}.spm.spatial.smooth.data(1) = ...
-    cfg_dep('Image Calculator: ImCalc Computed Image: b_pallidum.nii', ...
+    cfg_dep(['Image Calculator: ImCalc Computed Image: ', fn_bg], ...
             substruct('.','val', '{}',{1}, '.','val', '{}',{1}, ...
                       '.','val', '{}',{1}), substruct('.','files'));
 matlabbatch{2}.spm.spatial.smooth.fwhm = [1 1 1]*mask_smoothing;
@@ -89,9 +108,9 @@ matlabbatch{2}.spm.spatial.smooth.im = 0;
 matlabbatch{2}.spm.spatial.smooth.prefix = 's';
 spm_jobman('run', matlabbatch);
 
-% load pallidum tpm
-fn_pallidum = ['s',fn_pallidum];
-Vpal = spm_vol(fullfile(dr_SB,fn_pallidum));
+% load BG tpm
+fn_bg = ['s',fn_bg];
+Vpal = spm_vol(fullfile(dr_TPMuswl,fn_bg));
 val_pal = spm_read_vols(Vpal);
 
 %% Update TPM by introducing a new tpm between GM and WM
@@ -101,22 +120,22 @@ min_tpm_icv = crc_USwL_get_defaults('uTPM.min_tpm_icv');
 vval_tpm = reshape(val_tpm , [prod(SZ(1:3)) SZ(4)]) - min_tpm;
 vval_utpm = zeros(prod(SZ(1:3)),SZ(4)+1);
 
-vval_utpm(:,7) = (vval_tpm(:,1)- min_tpm_icv).*val_pal(:) ; % Pallidum
+vval_utpm(:,7) = (vval_tpm(:,1)- min_tpm_icv).*val_pal(:) ; % BG
 vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus pallidum
 vval_utpm(:,2:SZ(4)) = vval_tpm(:,2:SZ(4)); % rest
 
 vval_utpm = vval_utpm*(1+SZ(4)*min_tpm)/(1+(SZ(4)+1)*min_tpm)+ min_tpm ; % non-zero everywhere
 val_utpm = reshape(vval_utpm,[SZ(1:3) SZ(4)+1]);
 
-% vval_utpm(:,7) = vval_tpm(:,1).*val_pal(:) - min_tpm_icv; % Pallidum
-% vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus pallidum
+% vval_utpm(:,7) = vval_tpm(:,1).*val_pal(:) - min_tpm_icv; % BG
+% vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus BG
 % vval_utpm(:,2:SZ(4)) = vval_tpm(:,2:SZ(4)); % rest
 % 
 % vval_utpm = vval_utpm*(1+SZ(4)*min_tpm)/(1+(SZ(4)+1)*min_tpm)+ min_tpm ; % non-zero everywhere
 % val_utpm = reshape(vval_utpm,[SZ(1:3) SZ(4)+1]);
 
 %% Save into file
-fn_TPMu = fullfile(dr_SB, spm_file(fn_TPM,'suffix','_uMPM'));
+fn_TPMu = fullfile(dr_TPMuswl, spm_file(fn_TPM,'suffix','_wBG'));
 Vtpm_u = Vtpm;
 Vtpm_u(7) = Vtpm(6);
 mem_sz = Vtpm(2).pinfo(3)-Vtpm(1).pinfo(3);
