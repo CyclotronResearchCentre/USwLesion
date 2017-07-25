@@ -10,11 +10,12 @@
 %    reasonably smooth when you look at their logs.
 % 
 % In practice all tissue classes have a minimal value of 10^-6 anywhere in
-% the TPMs
+% the TPMs. And in the intra-cranial volume the brain tissues (GM, WM and 
+% CSF) all have a minimal value of 10^-3.
 % 
 % PROBLEM:
-% When checking the TPMs named nwTPM_sl2.nii, I noticed that in some places
-% the tissue probability was exactly equal to 0.
+% When checking the TPMs named "nwTPM_sl2.nii"(*), I noticed that in some 
+% places the tissue probability was exactly equal to 0.
 % The places where the TPMs are =0 are 
 % - outside the head volume for the GM/WM/CSF tissue classes,
 % - inside the brain for the skull tissue class
@@ -27,12 +28,21 @@
 %
 % One could also explicitly smooth some log-TPMs to make it smoother in
 % areas of low values, where there is a bit of 'noise'.
+% 
+% OUTPUT:
+% Since this is an extension for the TPM for multi-parametric MRIs, let's
+% call the new TPMs "eTPM.nii"
 %
+% (*) These TPM are the result of the paper by Lorio et al. (with B.
+% Draganki last author), Neuroimage, 2016: 10.1016/j.neuroimage.2016.01.062
 %_______________________________________________________________________
-% Copyright (C) 2015 Cyclotron Research Centre
+% Copyright (C) 2016 Cyclotron Research Centre
 
 % Written by C. Phillips.
 % Cyclotron Research Centre, University of Liege, Belgium
+
+%% New TPM name
+fn_etpm = 'eTPM.nii';
 
 %% For sanity check, visualize all TPMs together and display intensities
 spm_check_registration(...
@@ -81,7 +91,7 @@ tpm_updt(:,:,:,5) = 1 - sum(tpm_updt(:,:,:,[1:4 6]),4);
 
 % Save updated TPMs
 Vtpm_u = spm_vol( fullfile(spm('dir'),'tpm','TPM.nii'));
-fn_TPM_upd = fullfile(spm('dir'),'tpm','unwTPM_sl2.nii');
+fn_TPM_upd = fullfile(spm('dir'),'tpm',fn_etpm);
 for ii=1:6
     Vtpm_u(ii).fname = fn_TPM_upd;
     Vtpm_u(ii) = spm_create_vol(Vtpm_u(ii));
@@ -97,12 +107,12 @@ spm_check_registration(...
     fullfile(spm('dir'),'tpm','TPM.nii,4'),...
     fullfile(spm('dir'),'tpm','TPM.nii,5'),...
     fullfile(spm('dir'),'tpm','TPM.nii,6'),...
-    fullfile(spm('dir'),'tpm','unwTPM_sl2.nii,1'),...
-    fullfile(spm('dir'),'tpm','unwTPM_sl2.nii,2'),...
-    fullfile(spm('dir'),'tpm','unwTPM_sl2.nii,3'),...
-    fullfile(spm('dir'),'tpm','unwTPM_sl2.nii,4'),...
-    fullfile(spm('dir'),'tpm','unwTPM_sl2.nii,5'),...
-    fullfile(spm('dir'),'tpm','unwTPM_sl2.nii,6'),...
+    fullfile(spm('dir'),'tpm',[fn_etpm,',1']),...
+    fullfile(spm('dir'),'tpm',[fn_etpm,',2']),...
+    fullfile(spm('dir'),'tpm',[fn_etpm,',3']),...
+    fullfile(spm('dir'),'tpm',[fn_etpm,',4']),...
+    fullfile(spm('dir'),'tpm',[fn_etpm,',5']),...
+    fullfile(spm('dir'),'tpm',[fn_etpm,',6']),...
     fullfile(spm('dir'),'tpm','nwTPM_sl2.nii,1'),...
     fullfile(spm('dir'),'tpm','nwTPM_sl2.nii,2'),...
     fullfile(spm('dir'),'tpm','nwTPM_sl2.nii,3'),...
