@@ -66,7 +66,7 @@ uswl_def.uTPM.b_write       = [0 0]; % not writing bias corrected images, as in 
 % Thresholding the MPM images
 %==========================================================================
 uswl_def.tMPM.strMPM = {'_A', '_MT', '_R1', '_R2'}; % filename parts
-uswl_def.tMPM.thrMPM = [200 5 2000 100]; % Thresholds for A, MT, R1 & R2.
+uswl_def.tMPM.thrMPM = [200 5 2000 .2]; % Thresholds for A, MT, R1 & R2.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %-Prevent users from making direct calls to spm_defaults

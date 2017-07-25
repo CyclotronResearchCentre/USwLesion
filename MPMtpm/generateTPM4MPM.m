@@ -23,17 +23,23 @@
 % The only requirement is to update the TPM with a new prior tissue class 
 % (for the pallidum) and to update the other priors, moslty the GM one.
 % There is one atlas distributed with SPM12, let's use it!
-% In practic this messes up a bit the general flow of images as the GM is
+% In practice this messes up a bit the general flow of images as the GM is
 % now "split" into 2 different images. Moreover some part of code are
 % hard-coded with the first 3 segmented images to be GM-WM-CSF. One way out
 % of this is to include the pallidum class at the end (7th position), then
 % after the segmentation c1 (GM minus pallidum) and c7 (pallidum only) 
-% images can be added together to produce a c1 image with the full GM.
+% images can be added together to produce a "new" c1 image with the full 
+% GM posterior probability map.
 % 
 % NOTE:
 % The same kind of problem occurs when a lesion class is introduced between
 % the WM and CSF, so it is important to check any SPM code dealing with
 % segmented tissue classes (e.g. cleaning!)
+%_______________________________________________________________________
+% Copyright (C) 2017 Cyclotron Research Centre
+
+% Written by C. Phillips.
+% Cyclotron Research Centre, University of Liege, Belgium
 
 %% DEFINE a few filenames
 fn_TPM = 'unwTPM_sl2.nii';
