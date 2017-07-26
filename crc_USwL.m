@@ -1,5 +1,50 @@
-function fn_out = crc_USwL(job)
-% Doing all the work of "Unified segmentation with lesion".
+function fn_out = crc_USwL(fn_in,options)
+% 
+% Function doing all the work of "Unified segmentation with lesion".
+% 
+% INPUT
+% - fn_in   : cell array (1x4) of input filenames
+%       {1} : lesion mask image
+%       {2} : reference structural image, used for the 1st segmentation
+%       {3} : multi-parametric maps 
+%       {4} : other structural images
+% - options :
+%       imgTpm  : tissue probability maps (just one 4D file)
+%       img4US  : flag -> images to use for the 2nd segmentation 
+%                   (0, ref only; 1, MPMs only; 2, MPMs+others)
+%                   MPMs
+%       biasreg : bias regularisation value
+%       biasfwhm: bias FWHM value (Inf = no bias correction) 
+%       biaswr  : flag -> save bias corrected and/or bias field ([0/1 0/1])
+%       NbGaussian : number of Gaussians per tissue class, incl. lesion.
+%       tpm4lesion : flag -> TPM(s) affected by the lesion
+%                      (0, GM; 1, WM; 2, GM+WM; 3, GM+WM+CSF) 
+%       thrMPM  : preliminary thresholding the MPMs, 0/1
+%       ICVmsk  : mask the MPMs & Other images by created ICV-mask, 0/1
+%       mrf     : MRF parameter
+%       cleanup : Standard post-US clean-up, should most likely not be 
+%                 applied (because there is an extra lesion-class) 
+%                 -> better set it to 0
+%       thrLesion: lesion mask extent thresholding 
+%                   (0, no thresh; k, keep size>k; Inf, keep only largest)
+% 
+% OUTPUT
+% - fn_out :
+%       wstruct     : warped structural reference
+%       fxMPM_i    : 'fixed' MPMs, i = 1, 2,... #MPM
+%       fxMPMmsk_i : map of fixed voxels for i^th MPM
+%       ICVmsk      : intra-cranial volume mask, as generated from str-ref
+%       kMPM_i      : masked i^th MPM
+%       kOth_i      : masked i^th Other image
+%       wMPM_i      : warped (masked) i^th MPM
+%       wOth_i      : warped (masked) i^th other image
+%       TPMl        : subject specific TPM with lesion
+%       segmImg     : structure with posterior tissue probabilities
+%           c(i)    : class #i in subject space
+%           wc(i)   : class #i in MNI space
+%           mwc(i)  : modulated class #i in MNI space
+% 
+% OPERATIONS
 % Here are the main steps:
 %   0. Clean up of the MPM images, based on each maps value range
 %   1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
@@ -27,11 +72,11 @@ function fn_out = crc_USwL(job)
 % Cyril Pernet updated few bits to work with no MPM images + added structural
 % normalization and N Gaussians - Edinburgh Imaging, The University of Edinburgh
 
-%% Collect input -> to fit into previously written code. :-)
-fn_in{1} = spm_file(job.imgMsk{1},'number',''); % Mask image
-fn_in{2} = spm_file(job.imgRef{1},'number',''); % structural reference
-fn_in{3} = char(spm_file(job.imgMPM,'number','')); % All MPM's
-fn_in{4} = char(spm_file(job.imgOth,'number','')); % Other images
+%% Input data
+% fn_in{1} = Mask image
+% fn_in{2} = structural reference
+% fn_in{3} = All MPM's
+% fn_in{4} = Other images
 if isempty(fn_in{3})
     nMPM = 0;
 else
@@ -42,10 +87,17 @@ if isempty(fn_in{4})
 else
     nOth = size(fn_in{4},1);
 end
+pth = spm_file(fn_in{2},'path');
+
+% By default no cleanup after US-with-lesion segmentation!
+if ~isfield(options,'cleanup') || ...
+        isempty(options.cleanup) || strcmp(options.cleanup,'<UNDEFINED>')
+    options.cleanup = 0;
+end
 
 % Check #Gaussians and #TPMs for the USwLesion segmentation.
-NbGaussian = job.options.NbGaussian;
-fn_tpm_USwL = job.options.imgTpm{1};
+NbGaussian = options.NbGaussian;
+fn_tpm_USwL = options.imgTpm{1};
 fn_tpm_USwL = spm_file(fn_tpm_USwL,'number','');
 Vtpm_USwL = spm_vol(fn_tpm_USwL);
 if numel(NbGaussian)~=(numel(Vtpm_USwL)+1)
@@ -60,7 +112,7 @@ opt = crc_USwL_get_defaults('uTPM');
 % Need to know the order of the images, ideally MT, A, R1, R2s and should
 % check with their filename? based on '_MT', '_A', '_R1', '_R2s'?
 fn_in_3_orig = fn_in{3};
-if job.options.thrMPM && nMPM ~= 0
+if options.thrMPM && nMPM ~= 0
     strMPM = crc_USwL_get_defaults('tMPM.strMPM');
     thrMPM = crc_USwL_get_defaults('tMPM.thrMPM');
     nSt = numel(strMPM);
@@ -99,18 +151,17 @@ end
 % - then grow volume by nDilate voxel(s) -> creates on the drive dt_Msk
 [fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minVol,opt.nDilate);
 
-%% 2. Apply the mask on the reference structural images -> k_sRef
+%% 2. Apply the lesion mask on the reference structural images -> k_sRef
 fn_kMTw = spm_file(fn_in{2},'prefix','k');
 Vi(1) = spm_vol(fn_in{2});
 Vi(2) = spm_vol(fn_dtMsk);
 Vo = Vi(1);
 Vo.fname = fn_kMTw;
 Vo = spm_imcalc(Vi,Vo,'i1.*(((i2>.5)-1)./((i2>.5)-1))');
-pth = spm_file(fn_in{2},'path');
 
 %% 3. Segment the masked structural (k_sRef), normalize the cleaned up mask
 % (t_Msk) and smooth it -> new TPM for the lesion.
-% Then create an ICV mask for MPM's ICV masking
+% Then create an ICV mask (for MPM's ICV masking)
 % Here use the default TPMs, as this is a reference structural image
 clear matlabbatch
 fn_tpm_msksegm = crc_USwL_get_defaults('msksegm.imgTpm');
@@ -122,13 +173,14 @@ fn_tpm_msksegm = crc_USwL_get_defaults('msksegm.imgTpm');
 spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
+fn_swICV = spm_file(fn_ICV,'prefix','sw');
 
 % Fix the ICV
 % Sometimes there are small holes in the ICV, from poor 1st US -> fill them
 fix_ICV(fn_ICV)
 
-% Apply the mask
-if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
+% Apply the mask -> this possibly overwrites the masked struct reference
+if options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
     fn_tmp = [];
     for ii=1:nMPM
         fn_MPM_ii = deblank(fn_in{3}(ii,:));
@@ -140,7 +192,6 @@ if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
         fn_tmp = char(fn_tmp,Vo.fname);
     end
     fn_in{3} = fn_tmp(2:end,:);
-    fn_swICV = spm_file(fn_ICV,'prefix','sw');
     % Mask other images too!
     fn_tmp = [];
     for ii=1:nOth
@@ -158,12 +209,12 @@ end
 %% 4. Update the TPMs to include an extra tissue class -> TPMms
 % Note that the lesion is inserted in *3rd position*, between WM and CSF!
 opt_tpm = struct(...
-    'tpm4lesion', job.options.tpm4lesion, ... % tissues to be modified for lesion (0/1/2/3) for GM / WM / GM+WM / GM+WM+CSF
+    'tpm4lesion', options.tpm4lesion, ... % tissues to be modified for lesion (0/1/2/3) for GM / WM / GM+WM / GM+WM+CSF
     'fn_tpm', fn_tpm_USwL, ... % tpm file name
     'tpm_ratio', opt.tpm_ratio, ... % ratio between healthy and lesion tissue
     'min_tpm_icv', opt.min_tpm_icv, ... % minimum value in intracranial volume
     'min_tpm', opt.min_tpm); % minum value overall
-if job.options.ICVmsk && nMPM ~= 0 % ICV-mask the TPMs
+if options.ICVmsk && nMPM ~= 0 % ICV-mask the TPMs
     opt_tpm.fn_swICV = fn_swICV; % smoothed-warped ICV mask to apply on TPMs
 end
 fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk); % that creates the new tissue class tmp
@@ -177,7 +228,7 @@ fn_TPMl = update_TPM_with_lesion(opt_tpm, fn_swtMsk); % that creates the new tis
 % have now lesions we increase the clean up (Markov = 2) but set cleanup to
 % none
 
-switch job.options.img4US
+switch options.img4US
     case 0
         fn_Img2segm = fn_in{2}; %#ok<*CCAT1>
     case 1
@@ -204,11 +255,11 @@ switch job.options.img4US
 end
 
 opt_segm = struct( ...
-    'b_param', [job.options.biasreg job.options.biasfwhm], ...
-    'b_write', job.options.biaswr, ...
+    'b_param', [options.biasreg options.biasfwhm], ...
+    'b_write', options.biaswr, ...
     'nGauss', NbGaussian, ...
-    'mrf', job.options.mrf, ...
-    'cleanup', job.options.cleanup);
+    'mrf', options.mrf, ...
+    'cleanup', options.cleanup);
 
 clear matlabbatch
 [matlabbatch] = batch_segment_l(fn_Img2segm, fn_TPMl, opt_segm);
@@ -228,20 +279,23 @@ if numel(NbGaussian)==8
     add_2_images(fn_mwCimg([1 end],:),fn_mwCimg(1,:), 16); % float32
 end
 
-%% 6. Apply the deformation onto the MPMs -> warped MPMs
+%% 6. Apply the deformation onto the MPMs/Other -> warped MPMs/Other
 
 fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
-% Apply on all images: strucural + MPM + others
-if isempty(fn_in{3})
-    %     fn_img2warp = {char(fn_in{2} , fn_in{4})};
-    fn_img2warp = {fn_in{4}};
-else
-    %     fn_img2warp = {char(fn_in{2} ,fn_in{3} , fn_in{4})};
-    fn_img2warp = {char(fn_in{3} , fn_in{4})};
+% Apply on all images: struct ref + MPM + others, if available
+
+fn_img2warp = {fn_in{2}}; % Always include struct-ref to be warped
+% Note that the warps are applied on the possible thresholded-masked
+% MPMs/Other, depending on options chosen.
+if ~isempty(fn_in{3})
+    fn_img2warp = {char(fn_img2warp{1}, fn_in{3})};
+end
+if ~isempty(fn_in{4})
+    fn_img2warp = {char(fn_img2warp{1} , fn_in{4})};
 end
 clear matlabbatch
 
-if job.options.biaswr(2) % bias image corrected image screated
+if options.biaswr(2) % bias image corrected image screated
     fn_img2warp = {spm_file(fn_img2warp{1},'prefix','m')};
 end
 
@@ -249,7 +303,11 @@ end
 spm_jobman('run', matlabbatch);
 
 fn_warped_struct = spm_file(fn_in{2},'prefix','w');
-fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
+if ~isempty(fn_in{3})
+    fn_warped_MPM = spm_file(fn_in{3},'prefix','w');
+else
+    fn_warped_MPM = '';
+end
 if ~isempty(fn_in{4})
     fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
 else
@@ -261,39 +319,45 @@ end
 %     spm_file(fn_in{3}(1,:),'prefix','smwc3') ); %#ok<*NASGU>
 
 %% 7. Collect all the image filenames created
-if ~isempty(fn_warped_struct)
-    for ii=1:size(fn_warped_struct,1) % warped structural
-        fn_out.(sprintf('wstruct%d',ii)) = {deblank(fn_warped_struct(ii,:))};
-    end
-end
 
-if job.options.thrMPM && nMPM ~= 0
+% There must always be a struct-ref -> warped one
+fn_out.wstruct = {deblank(fn_warped_struct(ii,:))};
+
+if options.thrMPM && nMPM ~= 0
     for ii=1:nMPM
-        fn_out.(sprintf('thrMPM%d',ii)) = ...
+        fn_out.(sprintf('fxMPM_%d',ii)) = ...
             {spm_file(deblank(fn_in_3_orig(ii,:)),'prefix','t')};
-        fn_out.(sprintf('thrMPMmsk%d',ii)) = ...
-            {spm_file(fn_in_3_orig(ii,:),'prefix','msk_')};
+        fn_out.(sprintf('fxMPMmsk_%d',ii)) = ...
+            {spm_file(fn_in_3_orig(ii,:),'prefix','fx_')};
     end
 end
 
 fn_out.ICVmsk = {fn_ICV};
-if job.options.ICVmsk && nMPM ~= 0;
+
+if options.ICVmsk && nMPM ~= 0;
     for ii=1:nMPM
-        fn_out.(sprintf('kMPM%d',ii)) = {deblank(fn_in{3}(ii,:))};
+        fn_out.(sprintf('kMPM_%d',ii)) = {deblank(fn_in{3}(ii,:))};
     end
+    for ii=1:nOth
+        fn_out.(sprintf('kOth_%d',ii)) = {deblank(fn_in{4}(ii,:))};
+    end
+
 end
 
 if ~isempty(fn_warped_MPM) % warped MPMs
     for ii=1:size(fn_warped_MPM,1)
-        fn_out.(sprintf('wMPM%d',ii)) = {deblank(fn_warped_MPM(ii,:))};
+        fn_out.(sprintf('wMPM_%d',ii)) = {deblank(fn_warped_MPM(ii,:))};
     end
 end
 
 if ~isempty(fn_warped_Oth)
     for ii=1:size(fn_warped_Oth,1) % warped Others
-        fn_out.(sprintf('wOth%d',ii)) = {deblank(fn_warped_Oth(ii,:))};
+        fn_out.(sprintf('wOth_%d',ii)) = {deblank(fn_warped_Oth(ii,:))};
     end
 end
+
+% subject specific TPM with lesion
+fn_out.TPMl = {fn_TPMl};
 
 % segmented tissues
 fn_out.segmImg.c1 = {deblank(fn_Cimg(1,:))}; % GM
@@ -310,10 +374,9 @@ fn_out.segmImg.mwc1 = {deblank(fn_mwCimg(1,:))}; % modulated warped GM
 fn_out.segmImg.mwc2 = {deblank(fn_mwCimg(2,:))}; % modulated warped WM
 fn_out.segmImg.mwc3 = {deblank(fn_mwCimg(3,:))}; % modulated warped Lesion
 fn_out.segmImg.mwc4 = {deblank(fn_mwCimg(4,:))}; % modulated warped CSF
-fn_out.TPMl = {fn_TPMl};
 
-if job.options.thrLesion ~= 0
-    crc_lesion_cleanup(fn_out.segmImg.c3,job.options.thrLesion);
+if options.thrLesion ~= 0
+    crc_lesion_cleanup(fn_out.segmImg.c3,options.thrLesion);
 end
 
 end
@@ -340,43 +403,43 @@ if crt_mask
     ll_fix = (dd<0) + (dd>thrMPM)*2;
     Vf = V;
     Vf.dt(1) = 2; % uint8
-    Vf.fname = spm_file(V.fname,'prefix','msk_');
+    Vf.fname = spm_file(V.fname,'prefix','fx_');
     Vf.descrip = 'fixed voxels, 1 if <0 and 2 if >thrMPM';
     Vf = spm_create_vol(Vf);
     Vf = spm_write_vol(Vf,reshape(ll_fix,sz_dd));
 end
 
 % Fix the image for the extreme values, <0 and >thr
-dd = abs(dd);
+dd = abs(dd); % Take the abs-value...
 NaboveThr = sum(dd>thrMPM);
-dd(dd>thrMPM) = thrMPM * (1 + randn(NaboveThr,1)*1e-3);
+dd(dd>thrMPM) = thrMPM * (1 + randn(NaboveThr,1)*1e-3); % cap to max + small rand-value
 dd = reshape(dd,sz_dd);
 
-if any(dd(:)==0)
-    % Fix for the small zero patches in some images:
-    % Principle
-    % do not worry about superlarge chunk of zero as this is outside the head.
-    % replace the zero's by the mean value of at least 9 non-zeros neighbours
-    % or
-    % start with the smaller cluster then iterate till everything is filled up.
-    sz_thr = 1000; % arbitrary maximum size of patch to fix
-    [L,num] = spm_bwlabel(double(~dd),18);
-    any_fix = false;
-    n_vx = zeros(num,1);
-    for ii=1:num
-        n_vx(ii) = sum(L(:)==ii);
-    end
-    
-    [sn_vx,li_cl] = sort(n_vx);
-    li_cl(sn_vx>sz_thr) = [];
-    sn_vx(sn_vx>sz_thr) = [];
-    
-    if ~isempty(li_cl)
-        for i_cl = li_cl'
-            dd = fix_ith_hole(i_cl,L,dd);
-        end
-    end
-end
+% if any(dd(:)==0)
+%     % Fix for the small zero patches in some images:
+%     % Principle
+%     % do not worry about superlarge chunk of zero as this is outside the head.
+%     % replace the zero's by the mean value of at least 9 non-zeros neighbours
+%     % or
+%     % start with the smaller cluster then iterate till everything is filled up.
+%     sz_thr = 1000; % arbitrary maximum size of patch to fix
+%     [L,num] = spm_bwlabel(double(~dd),18);
+%     any_fix = false;
+%     n_vx = zeros(num,1);
+%     for ii=1:num
+%         n_vx(ii) = sum(L(:)==ii);
+%     end
+%     
+%     [sn_vx,li_cl] = sort(n_vx);
+%     li_cl(sn_vx>sz_thr) = [];
+%     sn_vx(sn_vx>sz_thr) = [];
+%     
+%     if ~isempty(li_cl)
+%         for i_cl = li_cl'
+%             dd = fix_ith_hole(i_cl,L,dd);
+%         end
+%     end
+% end
 
 % Save results
 Vc = V;
@@ -384,7 +447,6 @@ Vc.fname = spm_file(V.fname,'prefix','t');
 Vc = spm_create_vol(Vc);
 Vc = spm_write_vol(Vc,dd);
 fn_out = Vc.fname;
-
 
 end
 
@@ -481,7 +543,7 @@ function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,sm
 % [1,2] defining inputs
 % [3] segmentation of the masked structural
 % [4,5] writing out + smoothing the normalized lesion mask
-% [6,7,8] creating the ICV-mask from c1/c2/c3/lesion-mask
+% [6,7,8] creating the ICV-mask: sum(c1/c2/c3/lesion-mask), smooth, thr >.3
 % [9,10] writing out + smoothing the normalized ICV-mask
 % [11] deleting temporary files
 %

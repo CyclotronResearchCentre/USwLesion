@@ -222,7 +222,7 @@ biasfwhm.def     = @(val)crc_USwL_get_defaults('segment.biasfwhm', val{:});
 %--------------------------------------------------------------------------
 biaswr         = cfg_menu;
 biaswr.tag     = 'biaswr';
-biaswr.name    = 'Save Bias Corrected';
+biaswr.name    = 'Save bias corrected';
 biaswr.help    = {'This is the option to save a bias corrected version of your images from this channel, or/and the estimated bias field. MR images are usually corrupted by a smooth, spatially varying artifact that modulates the intensity of the image (bias). These artifacts, although not usually a problem for visual inspection, can impede automated processing of the images.  The bias corrected version should have more uniform intensities within the different types of tissues.'};
 biaswr.labels = {
                 'Save Nothing'
@@ -258,7 +258,7 @@ NbGaussian.def     = @(val)crc_USwL_get_defaults('segment.NbGaussian', val{:});
 % ---------------------------------------------------------------------
 thrMPM         = cfg_menu;
 thrMPM.tag     = 'thrMPM';
-thrMPM.name    = 'Thresholding the MPMs';
+thrMPM.name    = 'Preliminary thresholding the MPMs';
 thrMPM.help    = {['Apply a threshold on the MPM''s to remove outlier ',...
     'values from the images before the segmentation itself.'],...
     ['Take the absolute value of voxels < 0. Voxels > thr are set to thr ',...
@@ -299,10 +299,10 @@ ICVmsk.def     = @(val)crc_USwL_get_defaults('segment.ICVmsk', val{:});
 % ---------------------------------------------------------------------
 thrLesion         = cfg_entry;
 thrLesion.tag     = 'thrLesion';
-thrLesion.name    = 'Thresholding the lesion mask';
+thrLesion.name    = 'Lesion mask extent thresholding';
 thrLesion.help    = {'Apply a spatial threshold on the lesion tissue class c3: ',...
     '- 0 means no threshold;' ,... 
-    '- k indicates that only clusters ofs ize larger or equal to k are kept;', ...
+    '- k indicates that only clusters of size larger or equal to k are kept;', ...
     '- ''Inf'' keeps only the largest cluster.'};
 thrLesion.num    = [1 1];
 thrLesion.def     = @(val)crc_USwL_get_defaults('segment.thrLesion', val{:});
@@ -318,24 +318,24 @@ mrf.strtype = 'r';
 mrf.num     = [1 1];
 mrf.def     = @(val)crc_USwL_get_defaults('segment.mrf', val{:});
 
-%--------------------------------------------------------------------------
-% cleanup Clean up any partitions
-%--------------------------------------------------------------------------
-cleanup         = cfg_menu;
-cleanup.tag     = 'cleanup';
-cleanup.name    = 'Clean Up';
-cleanup.help    = {
-    'This uses a crude routine for extracting the brain from segmented images.  It begins by taking the white matter, and eroding it a couple of times to get rid of any odd voxels.  The algorithm continues on to do conditional dilations for several iterations, where the condition is based upon gray or white matter being present.This identified region is then used to clean up the grey and white matter partitions.  Note that the fluid class will also be cleaned, such that aqueous and vitreous humour in the eyeballs, as well as other assorted fluid regions (except CSF) will be removed.'
-    ''
-    'If you find pieces of brain being chopped out in your data, then you may wish to disable or tone down the cleanup procedure. Note that the procedure uses a number of assumptions about what each tissue class refers to.  If a different set of tissue priors are used, then this routine should be disabled.'
-    }';
-cleanup.labels = {
-    'Dont do cleanup'
-    'Light Clean'
-    'Thorough Clean'
-    }';
-cleanup.values = {0 1 2};
-cleanup.def     = @(val)crc_USwL_get_defaults('segment.cleanup', val{:});
+% %--------------------------------------------------------------------------
+% % cleanup Clean up any partitions
+% %--------------------------------------------------------------------------
+% cleanup         = cfg_menu;
+% cleanup.tag     = 'cleanup';
+% cleanup.name    = 'Clean Up';
+% cleanup.help    = {
+%     'This uses a crude routine for extracting the brain from segmented images.  It begins by taking the white matter, and eroding it a couple of times to get rid of any odd voxels.  The algorithm continues on to do conditional dilations for several iterations, where the condition is based upon gray or white matter being present.This identified region is then used to clean up the grey and white matter partitions.  Note that the fluid class will also be cleaned, such that aqueous and vitreous humour in the eyeballs, as well as other assorted fluid regions (except CSF) will be removed.'
+%     ''
+%     'If you find pieces of brain being chopped out in your data, then you may wish to disable or tone down the cleanup procedure. Note that the procedure uses a number of assumptions about what each tissue class refers to.  If a different set of tissue priors are used, then this routine should be disabled.'
+%     }';
+% cleanup.labels = {
+%     'Dont do cleanup'
+%     'Light Clean'
+%     'Thorough Clean'
+%     }';
+% cleanup.values = {0 1 2};
+% cleanup.def     = @(val)crc_USwL_get_defaults('segment.cleanup', val{:});
 
 % ---------------------------------------------------------------------
 % options Options
@@ -343,7 +343,9 @@ cleanup.def     = @(val)crc_USwL_get_defaults('segment.cleanup', val{:});
 options         = cfg_branch;
 options.tag     = 'options';
 options.name    = 'Options';
-options.val     = {imgTpm img4US biasreg biasfwhm biaswr NbGaussian tpm4lesion thrMPM ICVmsk mrf cleanup thrLesion};
+% options.val     = {imgTpm img4US biasreg biasfwhm biaswr NbGaussian tpm4lesion thrMPM ICVmsk mrf cleanup thrLesion};
+options.val     = {imgTpm img4US biasreg biasfwhm biaswr NbGaussian ...
+                    tpm4lesion thrMPM ICVmsk mrf thrLesion};
 options.help    = {'Some processing options.'};
 %_______________________________________________________________________
 
@@ -362,7 +364,7 @@ USwL.help    = {['Unified segmentation for images with lesions when an ',...
     'is applied.'],...
     '',...
     'All images are assumed to be already coregistered!'};
-USwL.prog = @crc_USwL;
+USwL.prog = @tbx_run_USwL;
 USwL.vout = @vout_USwL;
 
 end
@@ -378,6 +380,12 @@ cdep.src_output = substruct('.','TPMl');
 % cdep.tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
 cdep.tgt_spec   = cfg_findspec({{'filter','nifti'}});
 
+% Warped struct-ref
+cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+cdep(end).sname      = 'Warped struct-ref';
+cdep(end).src_output = substruct('.','wstruct');
+cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+
 % ICV mask
 cdep(end+1)          = cfg_dep; %#ok<*AGROW>
 cdep(end).sname      = 'Subject''s ICV mask, native space';
@@ -388,15 +396,14 @@ cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 if job.options.thrMPM
     for ii=1:numel(job.imgMPM)
         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-        cdep(end).sname      = sprintf('Thresholded MPM image #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('thrMPM%d',ii));
+        cdep(end).sname      = sprintf('Fixed MPM image #%d',ii);
+        cdep(end).src_output = substruct('.',sprintf('fxMPM_%d',ii));
         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
     end
     for ii=1:numel(job.imgMPM)
         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-        %         cdep(end).sname      = sprintf('Mask thresholded MPM #%d',ii);
-        cdep(end).sname      = sprintf('Threshold-mask MPM #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('thrMPMmsk%d',ii));
+        cdep(end).sname      = sprintf('Fix-mask MPM #%d',ii);
+        cdep(end).src_output = substruct('.',sprintf('fxMPMmsk_%d',ii));
         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
     end
 end
@@ -406,7 +413,13 @@ if job.options.ICVmsk
     for ii=1:numel(job.imgMPM)
         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
         cdep(end).sname      = sprintf('ICV-masked MPM #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('kMPM%d',ii));
+        cdep(end).src_output = substruct('.',sprintf('kMPM_%d',ii));
+        cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+    end
+    for ii=1:numel(job.imgOth)
+        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+        cdep(end).sname      = sprintf('ICV-masked Other #%d',ii);
+        cdep(end).src_output = substruct('.',sprintf('kOth_%d',ii));
         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
     end
 end
@@ -416,7 +429,7 @@ if ~isempty(job.imgMPM)
     for ii=1:numel(job.imgMPM)
         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
         cdep(end).sname      = sprintf('Warped MPM image #%d',ii);
-        cdep(end).src_output = substruct('.',['wMPM',num2str(ii)]);
+        cdep(end).src_output = substruct('.',sprintf('wMPM_%d',ii));
         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
     end
 end
@@ -425,7 +438,7 @@ if ~isempty(job.imgOth)
     for ii=1:numel(job.imgOth)
         cdep(end+1)          = cfg_dep;
         cdep(end).sname      = sprintf('Warped Other image #%d',ii);
-        cdep(end).src_output = substruct('.',['wOth',num2str(ii)]);
+        cdep(end).src_output = substruct('.',sprintf('wOth_%d',ii));
         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
     end
 end
@@ -434,7 +447,7 @@ end
 for ii=1:4
     cdep(end+1)          = cfg_dep;
     cdep(end).sname      = sprintf('c%d image',ii);
-    cdep(end).src_output = substruct('.','segmImg','.',['c',num2str(ii)]);
+    cdep(end).src_output = substruct('.','segmImg','.',sprintf('c%d',ii));
     cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
 
@@ -442,7 +455,7 @@ end
 for ii=1:4
     cdep(end+1)          = cfg_dep;
     cdep(end).sname      = sprintf('wc%d image',ii);
-    cdep(end).src_output = substruct('.','segmImg','.',['wc',num2str(ii)]);
+    cdep(end).src_output = substruct('.','segmImg','.',sprintf('wc%d',ii));
     cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
 
@@ -450,7 +463,7 @@ end
 for ii=1:4
     cdep(end+1)          = cfg_dep;
     cdep(end).sname      = sprintf('mwc%d image',ii);
-    cdep(end).src_output = substruct('.','segmImg','.',['mwc',num2str(ii)]);
+    cdep(end).src_output = substruct('.','segmImg','.',sprintf('mwc%d',ii));
     cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
 
