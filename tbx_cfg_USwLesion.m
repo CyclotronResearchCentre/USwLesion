@@ -15,6 +15,16 @@ if ~isdeployed,
 end
 
 %----------------------------------------------------------------------
+% Setting up 'Utils' modules
+%----------------------------------------------------------------------
+USwLutils         = cfg_choice;
+USwLutils.tag     = 'USwLutils';
+USwLutils.name    = 'US with Lesion Utilities';
+USwLutils.help    = {'Some utility functions for the US-with-Lesion tools.'
+        }';
+USwLutils.values  = {tbx_scfg_Utils_FxMsk tbx_scfg_ParEx};
+
+%----------------------------------------------------------------------
 % Setting up main choices
 %----------------------------------------------------------------------
 USwLtools         = cfg_choice;
@@ -26,6 +36,6 @@ USwLtools.help    = {
     ['One need to provide an (approximate) mask of the lesioned area(s)',...
     'in order to use this tool!']
     }';
-USwLtools.values  = {tbx_scfg_USwL tbx_scfg_MPMsmooth tbx_scfg_ParEx};
+USwLtools.values  = {tbx_scfg_USwL tbx_scfg_MPMsmooth USwLutils};
 
 end
