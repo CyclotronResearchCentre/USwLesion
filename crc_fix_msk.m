@@ -8,7 +8,8 @@ function fn_msk = crc_fix_msk(fn_msk,opt)
 % INPUT:
 % - fn_msk  : filename to (ICV) mask volume on disk
 % - opt     : option structure
-%   .sz_thr : maximum size (mm^3) of small blobs that can be filled up
+%   .sz_thr  : max size (mm^3) of small blobs to be filled up (1000, def.)
+%   .fn_iwarp: filename to inverse warping to use SPM-ICV mask
 % 
 % OUTPUT:
 % - fn_msk  : same filename since the mask is overwritten.
@@ -27,7 +28,8 @@ any_fix = false; % Flag to remember if something was fixed, start as 'no'
 
 % Check options
 opt_o = struct(...
-    'sz_thr', 1000); % maximum size (mm^3) of small blobs to be filled up
+    'sz_thr', 1000, ... % maximum size (mm^3) of small blobs to be filled up
+    'fn_iwarp', []);
 opt = crc_check_flag(opt_o,opt);
 
 % Load in mask
@@ -60,6 +62,10 @@ if numel(n_vx)>1
         v_msk(L==ii) = 0;
     end
     any_fix = true;
+end
+
+%% Use inverse warped SPM-ICV to fix ICV mask, if requested
+if ~isempty(opt.fn_iwarp)
 end
 
 %% Write out if somethign was fixed
