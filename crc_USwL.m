@@ -113,32 +113,14 @@ opt = crc_USwL_get_defaults('uTPM');
 % check with their filename? based on '_MT', '_A', '_R1', '_R2s'?
 fn_in_3_orig = fn_in{3};
 if options.thrMPM && nMPM ~= 0
-    strMPM = crc_USwL_get_defaults('tMPM.strMPM');
-    thrMPM = crc_USwL_get_defaults('tMPM.thrMPM');
-    nSt = numel(strMPM);
-    fn_tmp = [];
-    for ii=1:nMPM % Loop over MPM files
-        mtch = zeros(nSt,1);
-        for jj=1:nSt
-            tmp = strfind(spm_file(fn_in{3}(ii,:),'filename'),strMPM{jj});
-            if ~isempty(tmp), mtch(jj) = tmp(end); end % pick last index if many
-        end
-        [~,p_mtch] = max(mtch);
-        if p_mtch
-            fn_tmp = char( fn_tmp , ...
-                fix_MPMintens(deblank(fn_in{3}(ii,:)),thrMPM(p_mtch)));
-        else
-            fprintf('\nCould not fix file : %s',fn_in{3}(ii,:))
-            fn_tmp = char( fn_tmp , deblank(fn_in{3}(ii,:)));
-        end
-    end
+    % Fix MPMs
+    fn_in{3} = crc_fix_MPMintens(fn_in{3});
     
     % Check if reference structural is one of the MPMs 
     % -> if match, use the fixed version!
-    is_StrucRef_MPM = strcmp(fn_in{2}, cellstr(fn_in{3}));
+    is_StrucRef_MPM = strcmp(fn_in{2}, cellstr(fn_in_3_orig));
     
     % Update the filenames with fixed MPMs
-    fn_in{3} = fn_tmp(2:end,:);
     if any(is_StrucRef_MPM)
         fn_in{2} = fn_in{3}(find(is_StrucRef_MPM),:);
     end
@@ -382,79 +364,15 @@ if options.thrLesion ~= 0
 end
 
 end
+
 %% =======================================================================
 %% SUBFUNCTIONS
 %% =======================================================================
 
-%% STEP 0: Fixing intensities of MPM images
-function fn_out = fix_MPMintens(fn_in,thrMPM)
-% Make sure that MPM intensities are within [0 thrMPM] by capping the
-% values. The resulting image is written out with the prefix 't'.
-% On top, create an info-image of voxels that were "fixed", with a value
-% of 1 if the voxel value was <0, or 2 if >thrMPM.
-
-crt_mask = true;
-
-% Load stuff
-V = spm_vol(fn_in);
-dd = spm_read_vols(V);
-sz_dd = size(dd); dd = dd(:);
-
-% Generation info-image
-if crt_mask
-    ll_fix = (dd<0) + (dd>thrMPM)*2;
-    Vf = V;
-    Vf.dt(1) = 2; % uint8
-    Vf.fname = spm_file(V.fname,'prefix','fx_');
-    Vf.descrip = 'fixed voxels, 1 if <0 and 2 if >thrMPM';
-    Vf = spm_create_vol(Vf);
-    Vf = spm_write_vol(Vf,reshape(ll_fix,sz_dd));
-end
-
-% Fix the image for the extreme values, <0 and >thr
-dd = abs(dd); % Take the abs-value...
-NaboveThr = sum(dd>thrMPM);
-dd(dd>thrMPM) = thrMPM * (1 + randn(NaboveThr,1)*1e-3); % cap to max + small rand-value
-dd = reshape(dd,sz_dd);
-
-% if any(dd(:)==0)
-%     % Fix for the small zero patches in some images:
-%     % Principle
-%     % do not worry about superlarge chunk of zero as this is outside the head.
-%     % replace the zero's by the mean value of at least 9 non-zeros neighbours
-%     % or
-%     % start with the smaller cluster then iterate till everything is filled up.
-%     sz_thr = 1000; % arbitrary maximum size of patch to fix
-%     [L,num] = spm_bwlabel(double(~dd),18);
-%     any_fix = false;
-%     n_vx = zeros(num,1);
-%     for ii=1:num
-%         n_vx(ii) = sum(L(:)==ii);
-%     end
-%     
-%     [sn_vx,li_cl] = sort(n_vx);
-%     li_cl(sn_vx>sz_thr) = [];
-%     sn_vx(sn_vx>sz_thr) = [];
-%     
-%     if ~isempty(li_cl)
-%         for i_cl = li_cl'
-%             dd = fix_ith_hole(i_cl,L,dd);
-%         end
-%     end
-% end
-
-% Save results
-Vc = V;
-Vc.fname = spm_file(V.fname,'prefix','t');
-Vc = spm_create_vol(Vc);
-Vc = spm_write_vol(Vc,dd);
-fn_out = Vc.fname;
-
-end
-
-%% STEP 1: Removing small lesion patches from mask
+%% STEP 1: 
+% Removing small lesion patches from mask
 function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minVol,nDilate)
-% 1) Trim a mask image by removing bits that would be to small to really
+% 1) Trim a mask image by removing bits that would be too small to really
 %    matter according to medical criteria
 %   For example cf. E. Lommers and MS patients:
 %    "Lesions will ordinarily be larger than 3 mm in cross section"
@@ -538,14 +456,19 @@ fn_dtMsk = V_nM.fname;
 
 end
 
-%% STEP 3: Creating the normalization batch for the masked structural image
+%% STEP 3: 
+% Creating the normalization batch to 
+%   + normalize the masked structural image
+%   + generate an ICV mask
+
 function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
 % [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
 % This batch includes:
 % [1,2] defining inputs
 % [3] segmentation of the masked structural
 % [4,5] writing out + smoothing the normalized lesion mask
-% [6,7,8] creating the ICV-mask: sum(c1/c2/c3/lesion-mask), smooth, thr >.3
+% [6,7,8] creating the ICV-mask: 
+%          [6] sum(c1/c2/c3/lesion-mask) -> [7] smooth -> [8] thr >.3
 % [9,10] writing out + smoothing the normalized ICV-mask
 % [11] deleting temporary files
 %
@@ -647,7 +570,8 @@ fn_ICV = fullfile(pth_img,fn_ICV);
 
 end
 
-%% STEP 4: Updating the TPM with an extra class, the lesion
+%% STEP 4: 
+% Updating the TPM with an extra class, the lesion
 % Note that in the resulting TPM the lesion is inserted in *3rd position*,
 % i.e. between WM and CSF!
 function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
@@ -854,7 +778,8 @@ end
 
 end
 
-%% STEP 5: Creating the segmentatin batch with 7 (or 8) tissue clasess
+%% STEP 5: 
+% Creating the segmentatin batch with 7 (or 8) tissue clasess
 % + smoothing of modulated warped tissue classes
 function [matlabbatch] = batch_segment_l(P,Ptpm_l,opt)
 % [matlabbatch] = batch_segment_l(P,Ptpm,param)
@@ -950,7 +875,8 @@ matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1];
 
 end
 
-%% STEP 6: Creating the normalization batch for the MPM
+%% STEP 6: 
+% Creating the normalization batch for the MPM
 function [matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp)
 % [malabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp)
 %
@@ -975,24 +901,5 @@ Vi = spm_vol(fn_in);
 Vo = spm_vol(fn_out);
 fl.dtype = dtype;
 Vo = spm_imcalc(Vi, Vo, 'i1+i2' ,fl);
-
-end
-
-%% FIXING the MPM maps for there holes (zero's) in the ICV volume
-function dd = fix_ith_hole(i_cl,L,dd)
-% use the image erode/grow to work from the outside in, propagating a "mean
-% value" of the outer values.
-
-if numel(i_cl)~=1
-    aa=1;
-end
-
-nvx = sum(L(:)==i_cl);
-if nvx==1
-    % easy case of isolated voxel
-else
-    % deal with other cases
-end
-
 
 end
