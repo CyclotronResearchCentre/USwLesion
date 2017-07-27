@@ -175,9 +175,11 @@ fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
 fn_swICV = spm_file(fn_ICV,'prefix','sw');
 
-% Fix the ICV
-% Sometimes there are small holes in the ICV, from poor 1st US -> fill them
-fix_ICV(fn_ICV)
+% Fix the ICV.
+% Sometimes there are small holes (up to 1000mm^3) in the ICV, 
+% from poor 1st US -> fill them
+opt_fx_mask.sz_thr = 1000;
+fn_ICV = crc_fix_msk(fn_ICV,opt_fx_mask);
 
 % Apply the mask -> this possibly overwrites the masked struct reference
 if options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
@@ -974,43 +976,6 @@ Vo = spm_vol(fn_out);
 fl.dtype = dtype;
 Vo = spm_imcalc(Vi, Vo, 'i1+i2' ,fl);
 
-end
-
-%% FIXING the ICV by filling small holes & removing big blobs outside brain
-function fix_ICV(fn_ICV)
-V_icv = spm_vol(fn_ICV);
-v_icv = spm_read_vols(V_icv);
-
-% Deal with small holes
-sz_thr = 1000; % arbitrary number of voxels for a regular hole in the ICV
-[L,num] = spm_bwlabel(double(~v_icv),18);
-any_fix = false;
-for ii=1:num
-    n_vx = sum(L(:)==ii);
-    if n_vx<=sz_thr % if not too big, fix it
-        v_icv(L(:)==ii) = 1;
-        any_fix = true;
-    end
-end
-
-% remove big blobs outside brain volume
-[L,num] = spm_bwlabel(v_icv);
-for ii=1:num
-    n_vx = sum(L(:)==ii);
-end
-
-if numel(n_vx)>1
-    [sn_vx,s_ind] = sort(n_vx);
-    for ii = s_ind(1:end-1) % clear all but the biggest
-        v_icv(L==ii) = 0;
-    end
-    any_fix = true;
-end
-
-if any_fix % Need to save something
-    %     V_icv.private.dat = v_icv;
-    spm_write_vol(V_icv,v_icv);
-end
 end
 
 %% FIXING the MPM maps for there holes (zero's) in the ICV volume
