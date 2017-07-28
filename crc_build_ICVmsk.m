@@ -16,7 +16,7 @@ function fn_out = crc_build_ICVmsk(fn_in,opt)
 %       fn_ref      : reference filename -> ['ICV_',fn_ref]
 %       fn_warp     : forward warping -> warped ICV
 %       fn_iwarp    : inverse warping -> fix ICV mask with SPM-ICV
-%       smoK        : kernel size of warped ICV smoothing
+%       smoK        : kernel size (mm) of warped ICV smoothing (4, by def.)
 % 
 % OUTPUT
 % - fn_out
@@ -38,13 +38,11 @@ if numel(opt.smoK)~=3
     opt.smoK = ones(1,3)*opt.smoK(1);
 end
 
-% nTC = size(fn_in,1);
 if ~isempty(opt.fn_ref)
     fn_ref = opt.fn_ref;
 else
     fn_ref = fn_in(1,:);
 end
-% pth = spm_file(fn_ref,'path');
 
 %% Create ICV mask: sum, smooth, threshold
 % 1/ sum
@@ -70,6 +68,10 @@ imc_fl.descrip = 'ICV mask';
 imc_fl.dmtx = 0;
 V_o2 = spm_imcalc(fn_stmp, V_o2, 'i1>.3' ,imc_fl); %#ok<*NASGU>
 
+% Delete tmp files
+delete(fn_tmp), delete(fn_stmp)
+
+% Collect output
 fn_out = fn_ICV;
 
 %% Fixing ICV
@@ -86,7 +88,7 @@ if ~isempty(opt.fn_warp)
     spm_jobman('run', matlabbatch);
     fn_wICV = spm_file(fn_ICV,'prefix','w');
     fn_out = char(fn_out,fn_wICV);
-    if ~isempty(opt.smoK)
+    if ~isempty(opt.smoK) && all(opt.smoK>0)
         % Smooth a bit
         fn_swICV = spm_file(fn_ICV,'prefix','sw');
         spm_smooth(fn_wICV,fn_swICV,opt.smoK);

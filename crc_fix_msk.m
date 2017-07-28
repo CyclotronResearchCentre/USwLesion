@@ -76,8 +76,10 @@ if ~isempty(opt.fn_iwarp)
     % Inverse warp SPM's ICV mask and merge this with the incoming ICV mask
     % + return some matching value (Jaccard index), for informative check.
     % https://en.wikipedia.org/wiki/Jaccard_index
-    [matlabbatch,fn_wicvSPM] = create_MB(opt.fn_iwarp,fn_msk);
+    [matlabbatch,fn_icvSPM] = create_MB(opt.fn_iwarp,fn_msk);
     spm_jobman('run', matlabbatch);
+    fn_wicvSPM = spm_file(fn_icvSPM,'prefix','w');
+
     % Smoothing a bit the wSPM-ICV to enlarge volume -> play safe!
     V_wicvSPM = spm_vol(fn_wicvSPM);
     Vo = V_wicvSPM; Vo.pinfo(1) = 1; spm_imcalc(V_wicvSPM, Vo, 'i1*255');
@@ -97,6 +99,8 @@ if ~isempty(opt.fn_iwarp)
         % Some voxels added from SPM-ICV
         any_fix = true;
     end
+    % Delete SPM-ICV files created locally
+    delete(fn_icvSPM), delete(fn_wicvSPM), delete(fn_swicvSPM)
 end
 
 %% Write out if something was fixed
@@ -110,7 +114,7 @@ end
 %% SUBFUNCTIONS
 % =======================================================================
 
-function [matlabbatch,fn_wicvSPM] = create_MB(fn_iwarp,fn_ICV)
+function [matlabbatch,fn_icvSPM_loc] = create_MB(fn_iwarp,fn_ICV)
 % Building matlabbatch for the normalize-write operation, muche easier than
 % building the deformation and applying it manually.
 % Bring SPM-ICV into subject space -> need to properly define the latter!
@@ -133,8 +137,6 @@ matlabbatch{1}.spm.spatial.normalise.write.subj.resample = {fn_icvSPM_loc};
 matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = img_bb;
 matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = vx_sz;
 matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 1;
-
-fn_wicvSPM = spm_file(fn_icvSPM_loc,'prefix','w');
 
 end
 
