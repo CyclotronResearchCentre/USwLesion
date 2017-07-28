@@ -124,7 +124,6 @@ if options.thrMPM && nMPM ~= 0
     if any(is_StrucRef_MPM)
         fn_in{2} = fn_in{3}(find(is_StrucRef_MPM),:);
     end
-    
 end
 
 %% 1. "Trim 'n grow" the mask image : -> t_Msk / dt_Msk
@@ -168,43 +167,28 @@ opt_ICV = struct( ...
     'fn_warp', spm_file(fn_kMTw,'prefix','y_'), ...
     'fn_iwarp', spm_file(fn_kMTw,'prefix','iy_'), ...
     'smoK', 4);
-fn_out = crc_build_ICVmsk(fn_TCin,opt_ICV);
-fn_ICV = deblank(fn_out(1,:));
-fn_swICV = deblank(fn_out(3,:));
+fn_icv_out = crc_build_ICVmsk(fn_TCin,opt_ICV);
+fn_ICV = deblank(fn_icv_out(1,:));
+fn_swICV = deblank(fn_icv_out(3,:));
 
 % Delete unnecesary files
-
-% fn_swICV = spm_file(fn_ICV,'prefix','sw');
-% 
-% % Fix the ICV.
-% % Sometimes there are small holes (up to 1000mm^3) in the ICV, 
-% % from poor 1st US -> fill them
-% opt_fx_mask.sz_thr = 1000;
-% fn_ICV = crc_fix_msk(fn_ICV,opt_fx_mask);
+to_delete = char( fn_TCin, opt_ICV.fn_warp, opt_ICV.fn_iwarp, ...
+    spm_file(fn_kMTw,'suffix','_seg8','ext','mat') );
+for ii=1:size(to_delete,1), delete(deblank(to_delete(ii,:))); end
 
 % Apply the mask -> this possibly overwrites the masked struct reference
 if options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
     fn_tmp = [];
     for ii=1:nMPM
         fn_MPM_ii = deblank(fn_in{3}(ii,:));
-        Vi(1) = spm_vol(fn_MPM_ii);
-        Vi(2) = spm_vol(fn_ICV);
-        Vo = Vi(1);
-        Vo.fname = spm_file(fn_MPM_ii,'prefix','k');
-        Vo = spm_imcalc(Vi,Vo,'i1.*i2');
-        fn_tmp = char(fn_tmp,Vo.fname);
+        fn_tmp = char(fn_tmp,mask_img(fn_MPM_ii,fn_ICV,'k'));
     end
     fn_in{3} = fn_tmp(2:end,:);
     % Mask other images too!
     fn_tmp = [];
     for ii=1:nOth
         fn_Oth_ii = deblank(fn_in{4}(ii,:));
-        Vi(1) = spm_vol(fn_Oth_ii);
-        Vi(2) = spm_vol(fn_ICV);
-        Vo = Vi(1);
-        Vo.fname = spm_file(fn_Oth_ii,'prefix','k');
-        Vo = spm_imcalc(Vi,Vo,'i1.*i2');
-        fn_tmp = char(fn_tmp,Vo.fname);
+        fn_tmp = char(fn_tmp,mask_img(fn_Oth_ii,fn_ICV,'k'));
     end
     fn_in{4} = fn_tmp(2:end,:);
 end
@@ -268,21 +252,67 @@ clear matlabbatch
 [matlabbatch] = batch_segment_l(fn_Img2segm, fn_TPMl, opt_segm);
 spm_jobman('run', matlabbatch);
 
-fn_Cimg   = spm_select('FPList',pth,'^c[0-9].*\.nii$');   % native space
-fn_rCimg  = spm_select('FPList',pth,'^rc[0-9].*\.nii$');  % native dartel imported
-fn_wCimg  = spm_select('FPList',pth,'^wc[0-9].*\.nii$');  % warped
-fn_mwCimg = spm_select('FPList',pth,'^mwc[0-9].*\.nii$'); % modulated warped
-
-% When using pallidum, i.e. extended TPM, then recombine GM with pallidum
-%  -> add c8 onto c1 -> only 1 image (c1) with GM + c8 with pallidum.
+fn_Cimg   = spm_select('FPList',pth, ...  % native space
+    '^c[0-9].*',spm_file(fn_Img2segm(1,:),'basename'),'\.nii$'); 
+fn_rCimg  = spm_select('FPList',pth, ...  % native dartel imported
+    '^rc[0-9].*',spm_file(fn_Img2segm(1,:),'basename'),'\.nii$');
+fn_wCimg  = spm_select('FPList',pth, ...  % warped
+    '^wc[0-9].*',spm_file(fn_Img2segm(1,:),'basename'),'\.nii$');
+fn_mwCimg = spm_select('FPList',pth, ...  % modulated warped
+    '^mwc[0-9].*',spm_file(fn_Img2segm(1,:),'basename'),'\.nii$');
+% When using BG, i.e. extended TPM, then recombine GM with BG
+%  -> add c8 onto c1 -> only 1 image (c1) with GM + c8 with BG.
 if numel(NbGaussian)==8
     add_2_images(fn_Cimg([1 end],:),  fn_Cimg(1,:), 2); % uint8
     add_2_images(fn_rCimg([1 end],:), fn_rCimg(1,:), 16); % float32
     add_2_images(fn_wCimg([1 end],:), fn_wCimg(1,:), 2); % uint8
-    add_2_images(fn_mwCimg([1 end],:),fn_mwCimg(1,:), 16); % float32
+    add_2_images(fn_mwCimg([1 end],:), fn_mwCimg(1,:), 16); % float32
+end
+
+% Rebuild ICV mask from latest segmentation, with some cleaning up
+fn_TCin = fn_Cimg(1:4,:);  % GM, WM, Lesion, CSF
+opt_ICV = struct( ...
+    'fn_ref', spm_file(fn_in{3}(1,:)), ...
+    'fn_warp', spm_file(fn_in{3}(1,:),'prefix','y_'), ...
+    'smoK', 0);
+fn_icv_out = crc_build_ICVmsk(fn_TCin,opt_ICV);
+fn_ICV = deblank(fn_icv_out(1,:));
+fn_wICV = deblank(fn_icv_out(2,:));
+
+% Apply mask on GM, WM, Lesion and CSF (+BG if there)
+for ii=1:4
+    mask_img(fn_Cimg(ii,:),fn_ICV,'');
+    mask_img(fn_rCimg(ii,:),fn_ICV,'');
+    mask_img(fn_wCimg(ii,:),fn_wICV,'');
+    mask_img(fn_mwCimg(ii,:),fn_wICV,'');
+end
+
+if numel(NbGaussian)==8
+    mask_img(fn_Cimg(end,:),fn_ICV,'');
+    mask_img(fn_rCimg(end,:),fn_ICV,'');
+    mask_img(fn_wCimg(end,:),fn_wICV,'');
+    mask_img(fn_mwCimg(end,:),fn_wICV,'');
+end
+
+% Apply the final ICV mask on MPM & Others
+if options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
+    fn_tmp = [];
+    for ii=1:nMPM
+        fn_MPM_ii = deblank(fn_in{3}(ii,:));
+        fn_tmp = char(fn_tmp,mask_img(fn_MPM_ii,fn_ICV,'k'));
+    end
+    fn_in{3} = fn_tmp(2:end,:);
+    % Mask other images too!
+    fn_tmp = [];
+    for ii=1:nOth
+        fn_Oth_ii = deblank(fn_in{4}(ii,:));
+        fn_tmp = char(fn_tmp,mask_img(fn_Oth_ii,fn_ICV,'k'));
+    end
+    fn_in{4} = fn_tmp(2:end,:);
 end
 
 %% 6. Apply the deformation onto the MPMs/Other -> warped MPMs/Other
+% Re-create an ICV mask
 
 fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
 % Apply on all images: struct ref + MPM + others, if available
@@ -324,7 +354,7 @@ end
 %% 7. Collect all the image filenames created
 
 % There must always be a struct-ref -> warped one
-fn_out.wstruct = {deblank(fn_warped_struct(ii,:))};
+fn_out.wstruct = {deblank(fn_warped_struct)};
 
 if options.thrMPM && nMPM ~= 0
     for ii=1:nMPM
@@ -344,7 +374,6 @@ if options.ICVmsk && nMPM ~= 0;
     for ii=1:nOth
         fn_out.(sprintf('kOth_%d',ii)) = {deblank(fn_in{4}(ii,:))};
     end
-
 end
 
 if ~isempty(fn_warped_MPM) % warped MPMs
@@ -568,7 +597,7 @@ if Ntpm_o==6
     % Standard TPM
     tpm_std = true;
 elseif Ntpm_o==7
-    % Special TPM for MPM (with pallidum)
+    % Special TPM for MPM (with BG)
     tpm_std = false;
 else
     error('Wrong number of TPM''s.');
@@ -579,7 +608,7 @@ if tpm_std
     tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
 else
     tpm_GM   = squeeze(sum(tpm_orig(:,:,:,[1 7]),4));
-    alpha    = squeeze(tpm_orig(:,:,:,1)./tpm_orig(:,:,:,7)); % ratio GM/pallidum
+    alpha    = squeeze(tpm_orig(:,:,:,1)./tpm_orig(:,:,:,7)); % ratio GM/BG
     tpm_WM   = squeeze(tpm_orig(:,:,:,2)); % used later on to define ICV
     tpm_CSF  = squeeze(tpm_orig(:,:,:,3));
 end
@@ -649,7 +678,7 @@ switch opt.tpm4lesion % update healthy tissue classes
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
             tpm_Pu(msk_ICV & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
-            tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
+            tpm_ext(:,:,:,7) = tpm_Pu; % update BG
         end
     case 1 % WM only
         tpm_WMu = tpm_healthy - tpm_Lu;
@@ -675,7 +704,7 @@ switch opt.tpm4lesion % update healthy tissue classes
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
             tpm_Pu(msk_ICV & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
-            tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
+            tpm_ext(:,:,:,7) = tpm_Pu; % update BG
             tpm_ext(:,:,:,2) = tpm_WMu; % update WM
         end
     case 3 % WM+GM+CSF
@@ -700,7 +729,7 @@ switch opt.tpm4lesion % update healthy tissue classes
             tpm_Pu(tpm_Gu<opt.min_tpm) = opt.min_tpm;
             tpm_Pu(msk_ICV & tpm_Pu<opt.min_tpm_icv) = opt.min_tpm_icv; % at least min_tpm_icv in ICV
             tpm_ext(:,:,:,1) = tpm_Gu; % update GM
-            tpm_ext(:,:,:,7) = tpm_Pu; % update pallidum
+            tpm_ext(:,:,:,7) = tpm_Pu; % update BG
             tpm_ext(:,:,:,2) = tpm_WMu; % update WM
             tpm_ext(:,:,:,3) = tpm_CSFu; % update CSF
         end
@@ -800,7 +829,7 @@ end
 if nG==7
     cr_native = [1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ];
     cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ];
-else % Using TPM with pallidum
+else % Using TPM with BG
     cr_native = [1 1 ; 1 1 ; 1 1 ; 1 0 ; 1 0 ; 1 0 ; 0 0 ; 1 1 ];
     cr_warped = [1 1 ; 1 1 ; 1 1 ; 1 1 ; 0 0 ; 0 0 ; 0 0 ; 1 1 ];
 end
@@ -870,5 +899,17 @@ Vi = spm_vol(fn_in);
 Vo = spm_vol(fn_out);
 fl.dtype = dtype;
 Vo = spm_imcalc(Vi, Vo, 'i1+i2' ,fl);
+
+end
+
+%% MASKING AN IMAGE
+function fn_kimg = mask_img(fn_img,fn_msk,prefix)
+% Masking an image by a mask, adding a prefix to the masked image.
+if nargin<2, prefix = 'k'; end
+fn_kimg = spm_file(fn_img,'prefix',prefix);
+Vi = spm_vol(char(fn_img,fn_msk));
+Vo = Vi(1);
+Vo.fname = fn_kimg;
+Vo = spm_imcalc(Vi,Vo,'i1.*(i2>0)');
 
 end
