@@ -77,7 +77,7 @@ opt_fx_mask.sz_thr = 1000;
 if ~isempty(opt.fn_iwarp)
     opt_fx_mask.fn_iwarp = opt.fn_iwarp;
 end
-crc_fix_msk(fn_ICV,opt_fx_mask); % overwriting the file
+crc_fix_msk(fn_ICV,opt_fx_mask); % overwriting the file fn_ICV
 
 %% Wapring and smoothing, if requested
 if ~isempty(opt.fn_warp)
@@ -94,13 +94,17 @@ if ~isempty(opt.fn_warp)
     end
 end
 
-% Output filename(s) collected on the way in fn_out
+%% Output filename(s) collected on the way -> fn_out
 fprintf('\nCreated the following ICV files:\n')
 for ii=1:size(fn_out,1)
     fprintf('\t%s\n',fn_out(ii,:));
 end
+
 end
 
+% =======================================================================
+%% SUBFUNCTIONS
+% =======================================================================
 
 function matlabbatch = create_MB(fn_ICV,fn_warp)
 % Building matlabbatch for the normalize-write operation, muche easier than

@@ -144,10 +144,11 @@ Vo = spm_imcalc(Vi,Vo,'i1.*(((i2>.5)-1)./((i2>.5)-1))');
 %% 3. Segment the masked structural (k_sRef), normalize the cleaned up mask
 % (t_Msk) and smooth it -> new TPM for the lesion.
 % Then create an ICV mask (for MPM's ICV masking)
-% Here use the default TPMs, as this is a reference structural image
+% Here use the standard TPMs, as this is a reference structural image
+% masked for the lesion, i.e. "cost function masking" approach.
 clear matlabbatch
 fn_tpm_msksegm = crc_USwL_get_defaults('msksegm.imgTpm');
-[matlabbatch,fn_ICV] = batch_normalize_smooth( ...
+matlabbatch = batch_normalize_smooth( ...
     fn_kMTw, ... % masked structural image used for the warping estimation
     fn_tMsk, ... % cleaned up lesion mask to be warped into MNI
     fn_tpm_msksegm{1}, ... % filename of tissue probability map
@@ -155,13 +156,31 @@ fn_tpm_msksegm = crc_USwL_get_defaults('msksegm.imgTpm');
 spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
-fn_swICV = spm_file(fn_ICV,'prefix','sw');
 
-% Fix the ICV.
-% Sometimes there are small holes (up to 1000mm^3) in the ICV, 
-% from poor 1st US -> fill them
-opt_fx_mask.sz_thr = 1000;
-fn_ICV = crc_fix_msk(fn_ICV,opt_fx_mask);
+% Build ICV, with some cleaning up
+fn_TCin = char( ...
+    spm_file(fn_kMTw,'prefix','c1'),... % GM
+    spm_file(fn_kMTw,'prefix','c2'),... % WM
+    spm_file(fn_kMTw,'prefix','c3'),... % CSF
+    fn_dtMsk); % dilated lesion mask, as masked struct-ref
+opt_ICV = struct( ...
+    'fn_ref', fn_kMTw, ...
+    'fn_warp', spm_file(fn_kMTw,'prefix','y_'), ...
+    'fn_iwarp', spm_file(fn_kMTw,'prefix','iy_'), ...
+    'smoK', 4);
+fn_out = crc_build_ICVmsk(fn_TCin,opt_ICV);
+fn_ICV = deblank(fn_out(1,:));
+fn_swICV = deblank(fn_out(3,:));
+
+% Delete unnecesary files
+
+% fn_swICV = spm_file(fn_ICV,'prefix','sw');
+% 
+% % Fix the ICV.
+% % Sometimes there are small holes (up to 1000mm^3) in the ICV, 
+% % from poor 1st US -> fill them
+% opt_fx_mask.sz_thr = 1000;
+% fn_ICV = crc_fix_msk(fn_ICV,opt_fx_mask);
 
 % Apply the mask -> this possibly overwrites the masked struct reference
 if options.ICVmsk && nMPM ~= 0 % ICV-mask the MPMs & others
@@ -365,9 +384,9 @@ end
 
 end
 
-%% =======================================================================
+% =======================================================================
 %% SUBFUNCTIONS
-%% =======================================================================
+% =======================================================================
 
 %% STEP 1: 
 % Removing small lesion patches from mask
@@ -461,16 +480,12 @@ end
 %   + normalize the masked structural image
 %   + generate an ICV mask
 
-function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
-% [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
+function matlabbatch = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
+% matlabbatch = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
 % This batch includes:
 % [1,2] defining inputs
 % [3] segmentation of the masked structural
 % [4,5] writing out + smoothing the normalized lesion mask
-% [6,7,8] creating the ICV-mask: 
-%          [6] sum(c1/c2/c3/lesion-mask) -> [7] smooth -> [8] thr >.3
-% [9,10] writing out + smoothing the normalized ICV-mask
-% [11] deleting temporary files
 %
 % INPUT:
 % - fn_kRef : masked structural image used for the warping estimation
@@ -483,7 +498,7 @@ function [matlabbatch,fn_ICV] = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,sm
 % - fn_ICV : file name to ICV mask created
 
 pth_img = spm_file(fn_tMsk,'path');
-fn_ICV = spm_file(spm_file(fn_kRef,'prefix','icv_'),'filename');
+% fn_ICV = spm_file(spm_file(fn_kRef,'prefix','icv_'),'filename');
 
 % get the defaults
 segm_def = crc_USwL_get_defaults('msksegm');
@@ -510,7 +525,7 @@ matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
 matlabbatch{3}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{3}.spm.spatial.preproc.warp.fwhm = 0;
 matlabbatch{3}.spm.spatial.preproc.warp.samp = 3;
-matlabbatch{3}.spm.spatial.preproc.warp.write = [0 1];
+matlabbatch{3}.spm.spatial.preproc.warp.write = [1 1];
 matlabbatch{4}.spm.spatial.normalise.write.subj.def(1) = cfg_dep('Segment: Forward Deformations', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','fordef', '()',{':'}));
 matlabbatch{4}.spm.spatial.normalise.write.subj.resample(1) = cfg_dep('Named File Selector: LesionMask(1) - Files', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{1}));
 matlabbatch{4}.spm.spatial.normalise.write.woptions.bb = [-90 -126 -72 ; 90 90 108];
@@ -521,52 +536,6 @@ matlabbatch{5}.spm.spatial.smooth.fwhm = smoKern*[1 1 1];
 matlabbatch{5}.spm.spatial.smooth.dtype = 16;
 matlabbatch{5}.spm.spatial.smooth.im = 0;
 matlabbatch{5}.spm.spatial.smooth.prefix = 's';
-matlabbatch{6}.spm.util.imcalc.input(1) = cfg_dep('Named File Selector: LesionMask(1) - Files', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{1}));
-matlabbatch{6}.spm.util.imcalc.input(2) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
-matlabbatch{6}.spm.util.imcalc.input(3) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
-matlabbatch{6}.spm.util.imcalc.input(4) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
-matlabbatch{6}.spm.util.imcalc.output = 'tmp.nii';
-matlabbatch{6}.spm.util.imcalc.outdir = {pth_img};
-matlabbatch{6}.spm.util.imcalc.expression = 'sum(X)';
-matlabbatch{6}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-matlabbatch{6}.spm.util.imcalc.options.dmtx = 1;
-matlabbatch{6}.spm.util.imcalc.options.mask = 0;
-matlabbatch{6}.spm.util.imcalc.options.interp = 1;
-matlabbatch{6}.spm.util.imcalc.options.dtype = 2;
-matlabbatch{7}.spm.spatial.smooth.data(1) = cfg_dep('Image Calculator: ImCalc Computed Image: tmp.nii', substruct('.','val', '{}',{6}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{7}.spm.spatial.smooth.fwhm = [8 8 8];
-matlabbatch{7}.spm.spatial.smooth.dtype = 0;
-matlabbatch{7}.spm.spatial.smooth.im = 0;
-matlabbatch{7}.spm.spatial.smooth.prefix = 's';
-matlabbatch{8}.spm.util.imcalc.input(1) = cfg_dep('Smooth: Smoothed Images', substruct('.','val', '{}',{7}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{8}.spm.util.imcalc.output = fn_ICV;
-matlabbatch{8}.spm.util.imcalc.outdir = {pth_img};
-matlabbatch{8}.spm.util.imcalc.expression = 'i1>.3';
-matlabbatch{8}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-matlabbatch{8}.spm.util.imcalc.options.dmtx = 0;
-matlabbatch{8}.spm.util.imcalc.options.mask = 0;
-matlabbatch{8}.spm.util.imcalc.options.interp = 1;
-matlabbatch{8}.spm.util.imcalc.options.dtype = 2;
-matlabbatch{9}.spm.spatial.normalise.write.subj.def(1) = cfg_dep('Segment: Forward Deformations', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','fordef', '()',{':'}));
-matlabbatch{9}.spm.spatial.normalise.write.subj.resample = {fullfile(pth_img,fn_ICV)};
-matlabbatch{9}.spm.spatial.normalise.write.woptions.bb = [-90 -126 -72 ; 90 90 108];
-matlabbatch{9}.spm.spatial.normalise.write.woptions.vox = [1.5 1.5 1.5];
-matlabbatch{9}.spm.spatial.normalise.write.woptions.interp = 4;
-matlabbatch{10}.spm.spatial.smooth.data(1) = cfg_dep('Normalise: Write: Normalised Images (Subj 1)', substruct('.','val', '{}',{9}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('()',{1}, '.','files'));
-matlabbatch{10}.spm.spatial.smooth.fwhm = smoKern*[1 1 1];
-matlabbatch{10}.spm.spatial.smooth.dtype = 16;
-matlabbatch{10}.spm.spatial.smooth.im = 0;
-matlabbatch{10}.spm.spatial.smooth.prefix = 's';
-matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(1) = cfg_dep('Segment: Seg Params', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','param', '()',{':'}));
-matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(2) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
-matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(3) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
-matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(4) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
-matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(5) = cfg_dep('Segment: Forward Deformations', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','fordef', '()',{':'}));
-matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(6) = cfg_dep('Image Calculator: ImCalc Computed Image: tmp.nii', substruct('.','val', '{}',{6}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.files(7) = cfg_dep('Smooth: Smoothed Images', substruct('.','val', '{}',{7}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{11}.cfg_basicio.file_dir.file_ops.file_move.action.delete = false;
-
-fn_ICV = fullfile(pth_img,fn_ICV);
 
 end
 
