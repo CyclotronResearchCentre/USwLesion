@@ -82,7 +82,7 @@ if ~isempty(opt.fn_iwarp)
 
     % Smoothing a bit the wSPM-ICV to enlarge volume -> play safe!
     V_wicvSPM = spm_vol(fn_wicvSPM);
-    Vo = V_wicvSPM; Vo.pinfo(1) = 1; spm_imcalc(V_wicvSPM, Vo, 'i1*255');
+    Vo = V_wicvSPM; Vo.pinfo(1) = 1/255; spm_imcalc(V_wicvSPM, Vo, 'i1>0');
     fn_swicvSPM = spm_file(fn_wicvSPM,'prefix','s');
     spm_smooth(fn_wicvSPM,fn_swicvSPM,ones(1,3)*4)
     Vo = V_msk; Vo.pinfo(1) = 1;
@@ -94,6 +94,7 @@ if ~isempty(opt.fn_iwarp)
     Jind = n_123(3)/sum(n_123);
     fprintf('\nJaccard index for subj-ICV & SPM-ICV : %1.4f\n',Jind)
     % Bring back to binary
+    Vo.pinfo(1) = 1/255; 
     spm_imcalc(Vo, Vo, 'i1>0',fl_imcalc);
     if n_123(2)>0
         % Some voxels added from SPM-ICV
@@ -123,8 +124,8 @@ prec_round = 1e6;
 
 V_icv = spm_vol(fn_ICV);
 vx_sz = round(sqrt(sum(V_icv.mat(1:3,1:3).^2))*prec_round)/prec_round;
-p_min = V_icv.mat*ones(4,1);
-p_max = V_icv.mat*[V_icv.dim 1]';
+p_min = -V_icv.mat\[0 0 0 1]' ;
+p_max = V_icv.dim' + p_min(1:3) ;
 img_bb = [-abs(p_min(1:3)') ; abs(p_max(1:3)')];
 
 % Bring in SPM-ICV into subject space

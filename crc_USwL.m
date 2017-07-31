@@ -172,7 +172,7 @@ fn_ICV = deblank(fn_icv_out(1,:));
 fn_swICV = deblank(fn_icv_out(3,:));
 
 % Delete unnecesary files
-to_delete = char( fn_TCin, opt_ICV.fn_warp, opt_ICV.fn_iwarp, ...
+to_delete = char( fn_TCin(1:3,:), opt_ICV.fn_warp, opt_ICV.fn_iwarp, ...
     spm_file(fn_kMTw,'suffix','_seg8','ext','mat') );
 for ii=1:size(to_delete,1), delete(deblank(to_delete(ii,:))); end
 

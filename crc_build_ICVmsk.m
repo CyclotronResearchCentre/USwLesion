@@ -91,7 +91,7 @@ if ~isempty(opt.fn_warp)
     if ~isempty(opt.smoK) && all(opt.smoK>0)
         % Smooth a bit
         fn_swICV = spm_file(fn_ICV,'prefix','sw');
-        spm_smooth(fn_wICV,fn_swICV,opt.smoK);
+        spm_smooth(fn_wICV,fn_swICV,opt.smoK,2);
         fn_out = char(fn_out,fn_swICV);
     end
 end
