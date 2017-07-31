@@ -1,47 +1,6 @@
-function fn_out = crc_MPMsmooth(job)
-% Applying tissue specific smoothing in order to limit partial volume
-% effect. This is specifically useful for the quantitative MPM images.
-%_______________________________________________________________________
-% Copyright (C) 2015 Cyclotron Research Centre
-
-% Written by C. Phillips.
-% Cyclotron Research Centre, University of Liege, Belgium
-
-fn_wMPM = char(job.wMPM);
-fn_mwTC = spm_file(char(job.wcImg),'number','');
-
-% Find list of tissue classes, tc_ind
-tc_ind = [];
-for ii = 1:size(fn_mwTC,1)
-    p = strfind(deblank(fn_mwTC(ii,:)),'wc');
-    tc_ind = [tc_ind str2double(deblank(fn_mwTC(ii,p+2)))]; %#ok<*AGROW>
-end
-
-% Collect the TPM_l
-tpm = spm_file(char(job.tpm_l),'number','');
-fn_lTPM = char;
-for ii = tc_ind
-    fn_lTPM = char( fn_lTPM , [tpm,',',num2str(ii)]);
-end
-fn_lTPM(1,:) = [];
-
-opt_process = struct( ...
-    'fwhm', job.fwhm, ...
-    'tpm', fn_lTPM) ; % , ...
-
-% Do it!
-% fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
-fn_out.fn = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
-
-end
-
-%__________________________________________________________________________
+function fn_finMPM = crc_uswl_MPMsmooth(fn_wMPM, fn_mwTC, opt)
 %
-%% SUBFUNCTION
-%__________________________________________________________________________
-function fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt)
-%
-% FORMAT fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_TC, opt)
+% FORMAT fn_finMPM = crc_uswl_MPMsmooth(fn_wMPM, fn_TC, opt)
 %
 % Applyin the "Bogdan treatment" (*) on MPM images that were processed
 % with 'unified segmentation' and NOT Dartel (as is usual).
@@ -119,7 +78,7 @@ for ii=1:nMPM
     % calculate signal, as in paper + masking smoothed TC>.05
     q = cell(nTC,1);
     for jj=1:nTC
-        q{jj} = spm_file(p{jj},'prefix','fin_');
+        q{jj} = spm_file(p{jj},'prefix','wa_');
         spm_imcalc(char(n{jj},m{jj},m{jj}), q{jj}, ...
             '(i1./i2).*(i3>0.05)',ic_flag);
     end
