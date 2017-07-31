@@ -21,8 +21,8 @@ Tbx_pth = spm_file(which('tbx_scfg_USwL.m'),'path');
 
 % Parameters for the segmentation with lesion 
 %==========================================================================
-uswl_def.segment.NbGaussian = [2 2 3 2 1 1 1 3]; 
-                            % GM/WM/lesion/CSF/skull/scalp/air/BasalGanglia
+uswl_def.segment.NbGaussian = [2  2  3      2   3     4     2   3]; 
+                             % GM/WM/lesion/CSF/skull/scalp/air/BasalGanglia
 uswl_def.segment.mrf        = 2;
 uswl_def.segment.cleanup    = 0;
 uswl_def.segment.imgTpm     = {fullfile(Tbx_pth,'eTPM','eTPM_wBG.nii')};
