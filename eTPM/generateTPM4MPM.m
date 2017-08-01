@@ -1,11 +1,11 @@
 %% Script to generate some MPM specific TPM
 %
 % WHY:
-% From some data check with several (elderly) subjects, the pallidum 
-% surrounding shows very different voxel intensities from those of the rest
-% of the GM (due to % iron deposit with age). This is particularly visible 
-% in the A (much darker voxels) and R2s (much brighter voxels) images. 
-% There is no obvious difference in the R1 neither MT imges.
+% From some data check with several (elderly) subjects, the basal ganglia 
+% (BG) surrounding shows very different voxel intensities from those of the
+% rest of the GM (due to % iron deposit with age). This is particularly 
+% visible in the A (much darker voxels) and R2s (much brighter voxels) 
+% images. There is no obvious difference in the R1 neither MT imges.
 % This change in intensities is most probably linked to normal ageing as
 % observed in the Callaghan et al., 2014, paper. This seems to be the main
 % reason why segmentation is usually performed on a MT image as the
@@ -15,8 +15,8 @@
 % then segmentation will *fail* for the "pallidum area". Those voxel end up
 % being classified as skin or anything but GM.
 % In practice Callaghan et al. report the following areas to be affected by
-% ageing in term of R2* values: pallidum, caudate, and putamen. This
-% approximately covers the basal ganglia (BG) area.
+% ageing in term of R2* values: pallidum, caudate, putamen, and thalami. 
+% This approximately covers the basal ganglia (BG) area.
 % 
 % HOW:
 % One solution is to improve the unified-segmentation (US) model. In this 
@@ -31,7 +31,7 @@
 % now "split" into 2 different images. Moreover some part of code are
 % hard-coded with the first 3 segmented images to be GM-WM-CSF. One way out
 % of this is to include the BG class at the end (7th position), then after 
-% the segmentation c1 (GM minus pallidum) and c7 (pallidum only) images can
+% the segmentation c1 (GM minus BG) and c7 (BG only) images can
 % be added together to produce a "new" c1 image with the full GM posterior 
 % probability map.
 % 
@@ -56,7 +56,7 @@ fn_atlas = 'labels_Neuromorphometrics.nii';
 fn_bg = 'msk_basalganglia.nii';
 dr_TPM = fullfile(spm('dir'),'tpm');
 dr_TPMuswl = fullfile(spm_file(which('tbx_cfg_USwLesion.m'),'path'),'eTPM');
-mask_smoothing = 4; % smoothing (in mm of FWHM) for the BG mask
+mask_smoothing = 8; % smoothing (in mm of FWHM) for the BG mask
 
 %% GET TPMs
 fn_TPMs = spm_select('ExtFPList',dr_TPM,fn_TPM,1:10);
@@ -75,13 +75,14 @@ val_tpm = reshape(vv',SZ);
 % fplot(sum(vv)-1)
 % sum(sum(vv)>1)
 
-%% EXTRACT Pallidum from atlas, binarized and smoothed (4mm FWHM)
+%% EXTRACT Basal Ganglia from atlas, binarized and smoothed (8mm FWHM)
 % List of L/R regions and coresponding indexes in the atlas from SPM12
 % - pallidum, #55 and #56
 % - caudate, #36 and #37
 % - putamen, #57 and #58
-% - nucleaus aaccumen, #23 and #30
-l_rois = [55 56 36 37 57 58 23 30];
+% - nucleaus accumbens, #23 and #30
+% - thamus proper, #59 and #60
+l_rois = [55 56 36 37 57 58 23 30 59 60];
 % Build function for imcalc function.
 func_imcalc = sprintf('(i1==%d)',l_rois(1));
 for ii=2:numel(l_rois)
@@ -110,8 +111,8 @@ spm_jobman('run', matlabbatch);
 
 % load BG tpm
 fn_bg = ['s',fn_bg];
-Vpal = spm_vol(fullfile(dr_TPMuswl,fn_bg));
-val_pal = spm_read_vols(Vpal);
+Vbg = spm_vol(fullfile(dr_TPMuswl,fn_bg));
+val_bg = spm_read_vols(Vbg);
 
 %% Update TPM by introducing a new tpm between GM and WM
 min_tpm = crc_USwL_get_defaults('uTPM.min_tpm');
@@ -120,14 +121,14 @@ min_tpm_icv = crc_USwL_get_defaults('uTPM.min_tpm_icv');
 vval_tpm = reshape(val_tpm , [prod(SZ(1:3)) SZ(4)]) - min_tpm;
 vval_utpm = zeros(prod(SZ(1:3)),SZ(4)+1);
 
-vval_utpm(:,7) = (vval_tpm(:,1)- min_tpm_icv).*val_pal(:) ; % BG
-vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus pallidum
+vval_utpm(:,7) = (vval_tpm(:,1)- min_tpm_icv).*val_bg(:) ; % BG
+vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus BG
 vval_utpm(:,2:SZ(4)) = vval_tpm(:,2:SZ(4)); % rest
 
 vval_utpm = vval_utpm*(1+SZ(4)*min_tpm)/(1+(SZ(4)+1)*min_tpm)+ min_tpm ; % non-zero everywhere
 val_utpm = reshape(vval_utpm,[SZ(1:3) SZ(4)+1]);
 
-% vval_utpm(:,7) = vval_tpm(:,1).*val_pal(:) - min_tpm_icv; % BG
+% vval_utpm(:,7) = vval_tpm(:,1).*val_bg(:) - min_tpm_icv; % BG
 % vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus BG
 % vval_utpm(:,2:SZ(4)) = vval_tpm(:,2:SZ(4)); % rest
 % 
