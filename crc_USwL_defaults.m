@@ -49,7 +49,7 @@ uswl_def.msksegm.imgTpm     = {fullfile(spm('dir'),'tpm','TPM.nii')};
 uswl_def.msksegm.biasreg    = 1e-05; % almost nothing, assuming we use MPMs
 uswl_def.msksegm.biasfwhm   = Inf; % no bias correction
 uswl_def.msksegm.biaswr     = [0 0]; % Not saving bias corrected/field images
-uswl_def.msksegm.NbGaussian = [2 2 2 3 4 2]; % GM/WM/CSF/skull/scalp/air
+uswl_def.msksegm.NbGaussian = [2 2 2 3 4 4]; % GM/WM/CSF/skull/scalp/air
 uswl_def.msksegm.mrf        = 2;
 uswl_def.msksegm.cleanup    = 1;
 
