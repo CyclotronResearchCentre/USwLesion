@@ -1,4 +1,4 @@
-%% Script to generate some specifc masks
+%% Script to generate some masks for brain split
 % 
 % WHY:
 % For the MPMs analysis of MS patients, it's not unusual to look at
@@ -11,8 +11,14 @@
 % the various 'patches' together into those 3 different masks.
 % 
 % OUTPUT
-% A single file is generated, msk_GMparts.nii, with 3 different volumes 
-% covering the GM from the cortex, subcorted and cerebellum.
+% A single file is generated, msk_BrainParts.nii, with 3 different volumes 
+% covering the brain: the cortex, subcortex (pons + basal ganglia) and 
+% cerebellum.
+% 
+% NOTE
+% The mask generated include *both* GM ande WM! It is up to the user to
+% also provide a segmented GM or WM map, e.g. c1*.nii and c2*.nii, in order
+% to decide which tissue type to work with.
 % 
 %_______________________________________________________________________
 % Copyright (C) 2017 Cyclotron Research Centre
@@ -22,7 +28,7 @@
 
 %% DEFINE a few filenames
 fn_atlas = 'labels_Neuromorphometrics.nii';
-fn_gm = 'msk_GMparts.nii';
+fn_parts = 'msk_BrainParts.nii';
 dr_TPM = fullfile(spm('dir'),'tpm'); % SPM's tpm folder
 dr_TPMuswl = fullfile(spm_file(which('tbx_cfg_USwLesion.m'),'path'), ...
     'eTPM'); % USwL's eTPM folder
@@ -38,11 +44,17 @@ SZ = size(val_atl);
 
 l_Rinds =  unique(val_atl(:));
 
-%% CORTICAL part
-% all regions with ind>99
+%% CORTICAL part without WM
+% all regions with ind>99 are cortical bits
 val_cort = double(val_atl>99);
 sval_cort = zeros(SZ);
 spm_smooth(val_cort,sval_cort,mask_smoothing./vx_sz); % extend a bit by smoothing
+
+%% CORTICAL part with WM
+% all regions with ind>99 are cortical bits, #44&45 and the cortical WM
+val_cort_wWM = double(val_atl>99) +  double(val_atl == 44)+  double(val_atl == 45) ;
+sval_cort_wWM = zeros(SZ);
+spm_smooth(val_cort_wWM,sval_cort_wWM,mask_smoothing./vx_sz); % extend a bit by smoothing
 
 %% SUBCORTICAL part
 l_rois = [ 23 30 31 32 35 36 37 47 48 55 56 57 58 59 60 61 62 75 76 ];
@@ -57,7 +69,8 @@ spm_smooth(val_subc,sval_subc,mask_smoothing./vx_sz); % extend a bit by smoothin
 % List of L/R regions and coresponding indexes in the atlas from SPM12
 % - cerebellum exterior, #38 and #39
 % - cerebellar vermal lobules, #71 72 73
-l_rois = [38 39 71 72 73];
+% - cerebellar WM, #40 41
+l_rois = [38 39 71 72 73 40 41];
 
 val_cereb = zeros(SZ);
 sval_cereb = zeros(SZ);
@@ -68,19 +81,23 @@ spm_smooth(val_cereb,sval_cereb,mask_smoothing./vx_sz); % extend a bit by smooth
 
 %% Build the 4D volume
 % Keep a voxel in a mask if sval>.1 and larger than the other 2
-val_gm  = zeros([SZ 3]);
-val_gm(:,:,:,1) = sval_cort>sval_thr & ...
+val_parts  = zeros([SZ 3]);
+val_parts(:,:,:,1) = sval_cort>sval_thr & ...
     sval_cort>sval_cereb & sval_cort>sval_subc; % -> cortical part
-val_gm(:,:,:,2) = sval_subc>sval_thr & ...
+val_parts(:,:,:,3) = sval_subc>sval_thr & ...
     sval_subc>sval_cereb & sval_subc>sval_cort; % -> sub-cortical part
-val_gm(:,:,:,3) = sval_cereb>sval_thr & ...
+val_parts(:,:,:,4) = sval_cereb>sval_thr & ...
     sval_cereb>sval_cort & sval_cereb>sval_subc; % -> cerebellum part
 
+val_parts(:,:,:,2) = sval_cort_wWM>sval_thr & ...
+    ~val_parts(:,:,:,3) & ~val_parts(:,:,:,3); % -> cortical part with WM
+
 %% save the 4D volume
-fn_mask = fullfile(dr_TPMuswl,fn_gm);
+fn_mask = fullfile(dr_TPMuswl,fn_parts);
 % assuming that Vatlas is a uint8 file -> 1 voxel = 1 byte
-descrip = {'Cotical GM mask','Subcortical GM mask','Cerebellar GM mask'};
-for ii=1:3
+descrip = {'Cotical GM mask', 'Cotical GM+WM mask', ...
+            'Subcortical GM mask','Cerebellar GM mask'};
+for ii=1:4
     V_mask(ii) = Vatlas; %#ok<*SAGROW>
     V_mask(ii).pinfo(1) = 1/255;
     V_mask(ii).pinfo(3) = V_mask(ii).pinfo(3) + (ii-1)*prod(SZ);
@@ -88,7 +105,7 @@ for ii=1:3
     V_mask(ii).n(1) = ii;
     V_mask(ii).descrip = descrip{ii};
     V_mask(ii) = spm_create_vol(V_mask(ii));
-    V_mask(ii) = spm_write_vol(V_mask(ii),val_gm(:,:,:,ii));
+    V_mask(ii) = spm_write_vol(V_mask(ii),val_parts(:,:,:,ii));
 end
 
 
