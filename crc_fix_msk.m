@@ -123,9 +123,11 @@ function [matlabbatch,fn_icvSPM_loc] = create_MB(fn_iwarp,fn_ICV)
 prec_round = 1e6;
 
 V_icv = spm_vol(fn_ICV);
+% voxel size rounded to some precision
 vx_sz = round(sqrt(sum(V_icv.mat(1:3,1:3).^2))*prec_round)/prec_round;
+% defining BB
 p_min = -V_icv.mat\[0 0 0 1]' ;
-p_max = V_icv.dim' + p_min(1:3) ;
+p_max = (V_icv.dim.*vx_sz)' + p_min(1:3) ;
 img_bb = [-abs(p_min(1:3)') ; abs(p_max(1:3)')];
 
 % Bring in SPM-ICV into subject space
