@@ -52,6 +52,7 @@ uswl_def.msksegm.biaswr     = [0 0]; % Not saving bias corrected/field images
 uswl_def.msksegm.NbGaussian = [2 2 2 3 4 4]; % GM/WM/CSF/skull/scalp/air
 uswl_def.msksegm.mrf        = 2;
 uswl_def.msksegm.cleanup    = 1;
+uswl_def.msksegm.native     = [[1 0];[1 0];[1 0];[0 0];[0 0];[0 0]]; 
 
 % Processing parameters for the creation of the updated TPM
 %==========================================================================

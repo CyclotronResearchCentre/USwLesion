@@ -541,11 +541,10 @@ matlabbatch{3}.spm.spatial.preproc.channel.vols(1) = cfg_dep('Named File Selecto
 matlabbatch{3}.spm.spatial.preproc.channel.biasreg = segm_def.biasreg;
 matlabbatch{3}.spm.spatial.preproc.channel.biasfwhm = segm_def.biasfwhm;
 matlabbatch{3}.spm.spatial.preproc.channel.write = segm_def.biaswr;
-opt_native = [[1 0];[1 0];[1 0];[0 0];[0 0];[0 0]];
 for ii=1:6
     matlabbatch{3}.spm.spatial.preproc.tissue(ii).tpm = {spm_file(fn_TPM,'number',ii)};
     matlabbatch{3}.spm.spatial.preproc.tissue(ii).ngaus = segm_def.NbGaussian(ii);
-    matlabbatch{3}.spm.spatial.preproc.tissue(ii).native = opt_native(ii,:);
+    matlabbatch{3}.spm.spatial.preproc.tissue(ii).native = segm_def.native(ii,:);
     matlabbatch{3}.spm.spatial.preproc.tissue(ii).warped = [0 0];
 end
 matlabbatch{3}.spm.spatial.preproc.warp.mrf = segm_def.mrf;
