@@ -14,8 +14,8 @@ function fn_out = crc_build_ICVmsk(fn_in,opt)
 % - fn_in   : filename of tissue classes to add together (char array)
 % - opt     : option structure
 %       fn_ref      : reference filename -> ['ICV_',fn_ref]
-%       fn_warp     : forward warping -> warped ICV
-%       fn_iwarp    : inverse warping -> fix ICV mask with SPM-ICV
+%       fn_warp     : forward warping -> create warped ICV
+%       fn_iwarp    : inverse warping -> fix ICV mask with inv-warped SPM-ICV
 %       smoK        : kernel size (mm) of warped ICV smoothing (4, by def.)
 % 
 % OUTPUT
@@ -81,7 +81,7 @@ if ~isempty(opt.fn_iwarp)
 end
 crc_fix_msk(fn_ICV,opt_fx_mask); % overwriting the file fn_ICV
 
-%% Wapring and smoothing, if requested
+%% Warping and smoothing, if requested
 if ~isempty(opt.fn_warp)
     % Apply warping
     matlabbatch = create_MB(fn_ICV,spm_file(opt.fn_warp,'number',''));
