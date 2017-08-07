@@ -1,6 +1,6 @@
 function fn_out = crc_invWarp_masks(fn_msk, fn_iwarp, fn_ref)
-% Function to inverse-warp, i.e. bring from tempalte (MNI) space into
-% subject space, some mask images (or anyother image infact).
+% Function to inverse-warp, i.e. bring from template (MNI) space into
+% subject space, some mask images (or any other image in fact).
 %
 % INPUT
 % - fn_msk   : filename(s) of (mask) image(s) to inv-warp (char array)
