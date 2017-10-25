@@ -11,9 +11,12 @@
 % the various 'patches' together into those 3 different masks.
 % 
 % OUTPUT
-% A single file is generated, msk_BrainParts.nii, with 3 different volumes 
-% covering the brain: the cortex, subcortex (pons + basal ganglia) and 
-% cerebellum.
+% A single file is generated, msk_BrainParts.nii, with 4 different volumes 
+% covering the brain: 
+% - cortex without WM, 
+% - cortex with WM, 
+% - subcortex (pons + basal ganglia), and
+% - cerebellum.
 % 
 % NOTE
 % The mask generated include *both* GM ande WM! It is up to the user to
