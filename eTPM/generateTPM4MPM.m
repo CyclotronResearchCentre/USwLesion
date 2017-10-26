@@ -50,13 +50,16 @@
 % Written by C. Phillips.
 % Cyclotron Research Centre, University of Liege, Belgium
 
-%% DEFINE a few filenames
+%% DEFINE a few filenames & parameters
 fn_TPM = 'eTPM.nii';
 fn_atlas = 'labels_Neuromorphometrics.nii';
 fn_bg = 'msk_basalganglia.nii';
+fn_brainp = 'msk_BrainParts.nii';
+% where #2 = cortical GM+WM, #3 = subcortex, #4 = cerebellum, #5 =
+% subcortex without BG, #6 = Basal Ganglia only.
 dr_TPM = fullfile(spm('dir'),'tpm');
 dr_TPMuswl = fullfile(spm_file(which('tbx_cfg_USwLesion.m'),'path'),'eTPM');
-mask_smoothing = 8; % smoothing (in mm of FWHM) for the BG mask
+mask_smoothing = [1 1 1]*4; % smoothing (in mm of FWHM) for the BG mask
 
 %% GET TPMs
 fn_TPMs = spm_select('ExtFPList',dr_TPM,fn_TPM,1:10);
@@ -65,54 +68,23 @@ Vtpm = spm_vol(fn_TPMs);
 
 val_tpm = spm_read_vols(Vtpm);
 SZ = size(val_tpm);
+vx_sz = sqrt(sum(Vtpm(1).mat(1:3,1:3).^2));
 
 %% Some checks & scaling
-vv = reshape(val_tpm,[prod(SZ(1:3)) SZ(4)])';
-sc_tpm = sum(vv);
-vv = vv./(ones(SZ(4),1)*sc_tpm);
-val_tpm = reshape(vv',SZ);
-
+% vv = reshape(val_tpm,[prod(SZ(1:3)) SZ(4)])';
+% sc_tpm = sum(vv);
+% vv = vv./(ones(SZ(4),1)*sc_tpm);
+% val_tpm = reshape(vv',SZ);
+% 
 % fplot(sum(vv)-1)
 % sum(sum(vv)>1)
 
-%% EXTRACT Basal Ganglia from atlas, binarized and smoothed (8mm FWHM)
-% List of L/R regions and coresponding indexes in the atlas from SPM12
-% - pallidum, #55 and #56
-% - caudate, #36 and #37
-% - putamen, #57 and #58
-% - nucleaus accumbens, #23 and #30
-% - thamus proper, #59 and #60
-l_rois = [55 56 36 37 57 58 23 30 59 60];
-% Build function for imcalc function.
-func_imcalc = sprintf('(i1==%d)',l_rois(1));
-for ii=2:numel(l_rois)
-    func_imcalc = [func_imcalc, sprintf(' + (i1==%d)',l_rois(ii))]; %#ok<*AGROW>
-end
-
-clear matlabbatch
-matlabbatch{1}.spm.util.imcalc.input = {fullfile(dr_TPM,fn_atlas)};
-matlabbatch{1}.spm.util.imcalc.output = fn_bg;
-matlabbatch{1}.spm.util.imcalc.outdir = {dr_TPMuswl};
-matlabbatch{1}.spm.util.imcalc.expression = func_imcalc;
-matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
-matlabbatch{1}.spm.util.imcalc.options.mask = 0;
-matlabbatch{1}.spm.util.imcalc.options.interp = 1;
-matlabbatch{1}.spm.util.imcalc.options.dtype = 2;
-matlabbatch{2}.spm.spatial.smooth.data(1) = ...
-    cfg_dep(['Image Calculator: ImCalc Computed Image: ', fn_bg], ...
-            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, ...
-                      '.','val', '{}',{1}), substruct('.','files'));
-matlabbatch{2}.spm.spatial.smooth.fwhm = [1 1 1]*mask_smoothing;
-matlabbatch{2}.spm.spatial.smooth.dtype = 16;
-matlabbatch{2}.spm.spatial.smooth.im = 0;
-matlabbatch{2}.spm.spatial.smooth.prefix = 's';
-spm_jobman('run', matlabbatch);
-
-% load BG tpm
-fn_bg = ['s',fn_bg];
-Vbg = spm_vol(fullfile(dr_TPMuswl,fn_bg));
-val_bg = spm_read_vols(Vbg);
+%% GET Basal Ganglia part + a little bit of smoothing
+fn_brp = fullfile(dr_TPMuswl,fn_brainp);
+Vbgm = spm_vol(spm_file(fn_brp,'number',6)); % basal ganglia mask
+val_bgm = spm_read_vols(Vbgm);
+sval_bgm = zeros(SZ(1:3));
+spm_smooth(val_bgm,sval_bgm,mask_smoothing./vx_sz); % extend a bit by smoothing
 
 %% Update TPM by introducing a new tpm between GM and WM
 min_tpm = crc_USwL_get_defaults('uTPM.min_tpm');
@@ -121,19 +93,12 @@ min_tpm_icv = crc_USwL_get_defaults('uTPM.min_tpm_icv');
 vval_tpm = reshape(val_tpm , [prod(SZ(1:3)) SZ(4)]) - min_tpm;
 vval_utpm = zeros(prod(SZ(1:3)),SZ(4)+1);
 
-vval_utpm(:,7) = (vval_tpm(:,1)- min_tpm_icv).*val_bg(:) ; % BG
+vval_utpm(:,7) = (vval_tpm(:,1)- min_tpm_icv).*sval_bgm(:) ; % BG mask
 vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus BG
 vval_utpm(:,2:SZ(4)) = vval_tpm(:,2:SZ(4)); % rest
 
 vval_utpm = vval_utpm*(1+SZ(4)*min_tpm)/(1+(SZ(4)+1)*min_tpm)+ min_tpm ; % non-zero everywhere
 val_utpm = reshape(vval_utpm,[SZ(1:3) SZ(4)+1]);
-
-% vval_utpm(:,7) = vval_tpm(:,1).*val_bg(:) - min_tpm_icv; % BG
-% vval_utpm(:,1) = vval_tpm(:,1) - vval_utpm(:,7); % GM minus BG
-% vval_utpm(:,2:SZ(4)) = vval_tpm(:,2:SZ(4)); % rest
-% 
-% vval_utpm = vval_utpm*(1+SZ(4)*min_tpm)/(1+(SZ(4)+1)*min_tpm)+ min_tpm ; % non-zero everywhere
-% val_utpm = reshape(vval_utpm,[SZ(1:3) SZ(4)+1]);
 
 %% Save into file
 fn_TPMu = fullfile(dr_TPMuswl, spm_file(fn_TPM,'suffix','_wBG'));
@@ -148,12 +113,12 @@ for ii=1:7
     Vtpm_u(ii) = spm_write_vol(Vtpm_u(ii),val_utpm(:,:,:,ii));
 end
 
-% Some checks
-zz = sum(vval_utpm,2)';
-fplot(zz-1)
-zz = sum(vval_tpm,2)';
-fplot(zz)
-
-zz = min(vval_utpm,[],2)';
-fplot(zz)
-any(zz<0)
+% % Some checks
+% zz = sum(vval_utpm,2)';
+% fplot(zz-1)
+% zz = sum(vval_tpm,2)';
+% fplot(zz)
+% 
+% zz = min(vval_utpm,[],2)';
+% fplot(zz)
+% any(zz<0)
