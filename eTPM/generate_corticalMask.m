@@ -39,7 +39,8 @@ fn_parts = 'msk_BrainParts.nii';
 dr_TPM = fullfile(spm('dir'),'tpm'); % SPM's tpm folder
 dr_TPMuswl = fullfile(spm_file(which('tbx_cfg_USwLesion.m'),'path'), ...
     'eTPM'); % USwL's eTPM folder
-mask_smoothing = 4*ones(1,3); % in mm
+mask_smoothing = ones(1,3)*4; % kernel size (in mm) for cortex & cerebellum
+mask_smoothing2 = mask_smoothing*2; % twice for subcortical
 sval_thr = .1; % threshold for smoothed volume
 nVols = 6;
 
@@ -71,7 +72,7 @@ sval_subc = zeros(SZ);
 for ii=l_rois
     val_subc = val_subc +  double(val_atl == ii);
 end
-spm_smooth(val_subc,sval_subc,mask_smoothing./vx_sz); % extend a bit by smoothing
+spm_smooth(val_subc,sval_subc,mask_smoothing2./vx_sz); % extend a bit by smoothing
 
 %% CEREBELLUM part
 % List of L/R regions and coresponding indexes in the atlas from SPM12
@@ -94,7 +95,7 @@ sval_subc_woBG = zeros(SZ);
 for ii=l_rois
     val_subc_woBG = val_subc_woBG +  double(val_atl == ii);
 end
-spm_smooth(val_subc_woBG,sval_subc_woBG,mask_smoothing./vx_sz); % extend a bit by smoothing
+spm_smooth(val_subc_woBG,sval_subc_woBG,mask_smoothing2./vx_sz); % extend a bit by smoothing
 
 %% SUBCORTICAL part, Basal Ganglia only
 % BG area includes these bits
@@ -109,7 +110,7 @@ sval_subc_BG = zeros(SZ);
 for ii=l_rois
     val_subc_BG = val_subc_BG +  double(val_atl == ii);
 end
-spm_smooth(val_subc_BG,sval_subc_BG,mask_smoothing./vx_sz); % extend a bit by smoothing
+spm_smooth(val_subc_BG,sval_subc_BG,mask_smoothing2./vx_sz); % extend a bit by smoothing
 
 %% Build the 4D volume
 % Keep a voxel in a mask if sval>.1 and larger than the other 2
@@ -126,10 +127,10 @@ val_parts(:,:,:,2) = sval_cort_wWM>sval_thr & ...
     ~val_parts(:,:,:,3) & ~val_parts(:,:,:,4); % -> cortical part with WM
 
 % Keep a voxel if sval>.1 and in sub-cortex but not in the other one
-val_parts(:,:,:,5) = val_subc_woBG>sval_thr & ...
-    val_subc_woBG>=val_subc_BG & val_parts(:,:,:,3); % -> sub-cortical wo BG
-val_parts(:,:,:,6) = val_subc_BG>sval_thr & ...
-    val_subc_BG>=val_subc_woBG & val_parts(:,:,:,3); % -> BG only
+val_parts(:,:,:,5) = sval_subc_woBG>sval_thr & ...
+    sval_subc_woBG>=sval_subc_BG & val_parts(:,:,:,3); % -> sub-cortical wo BG
+val_parts(:,:,:,6) = sval_subc_BG>sval_thr & ...
+    sval_subc_BG>=sval_subc_woBG & val_parts(:,:,:,3); % -> BG only
 
 %% save the 4D volume
 fn_mask = fullfile(dr_TPMuswl,fn_parts);
@@ -147,33 +148,3 @@ for ii=1:nVols
     V_mask(ii) = spm_create_vol(V_mask(ii));
     V_mask(ii) = spm_write_vol(V_mask(ii),val_parts(:,:,:,ii));
 end
-
-
-% %% Bits to create images -> easier to figure out what's in/out
-% % Build function for imcalc function.
-% func_imcalc = sprintf('(i1==%d)',l_rois(1));
-% for ii=2:numel(l_rois)
-%     func_imcalc = [func_imcalc, sprintf(' + (i1==%d)',l_rois(ii))]; %#ok<*AGROW>
-% end
-% % func_imcalc = 'i1>99';
-% 
-% clear matlabbatch
-% matlabbatch{1}.spm.util.imcalc.input = {fullfile(dr_TPM,fn_atlas)};
-% matlabbatch{1}.spm.util.imcalc.output = 'tmp.nii';
-% matlabbatch{1}.spm.util.imcalc.outdir = {dr_TPMuswl};
-% matlabbatch{1}.spm.util.imcalc.expression = func_imcalc;
-% matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-% matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
-% matlabbatch{1}.spm.util.imcalc.options.mask = 0;
-% matlabbatch{1}.spm.util.imcalc.options.interp = 1;
-% matlabbatch{1}.spm.util.imcalc.options.dtype = 2;
-% % spm_jobman('run', matlabbatch);
-% matlabbatch{2}.spm.spatial.smooth.data(1) = ...
-%     cfg_dep(['Image Calculator: ImCalc Computed Image: ', 'tmp.nii'], ...
-%             substruct('.','val', '{}',{1}, '.','val', '{}',{1}, ...
-%                       '.','val', '{}',{1}), substruct('.','files'));
-% matlabbatch{2}.spm.spatial.smooth.fwhm = [1 1 1]*mask_smoothing;
-% matlabbatch{2}.spm.spatial.smooth.dtype = 16;
-% matlabbatch{2}.spm.spatial.smooth.im = 0;
-% matlabbatch{2}.spm.spatial.smooth.prefix = 's';
-% spm_jobman('run', matlabbatch);
