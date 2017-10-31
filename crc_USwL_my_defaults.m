@@ -21,18 +21,25 @@ Tbx_pth = spm_file(which('tbx_scfg_USwL.m'),'path');
 
 % Parameters for the segmentation with lesion 
 %==========================================================================
-uswl_def.segment.NbGaussian = [2  2  3      2   3     4     2   3]; 
-                             % GM/WM/lesion/CSF/skull/scalp/air/BasalGanglia
+uswl_def.segment.NbGaussian = [2  2  3      2   3     4     2   2]; 
+                             % GM/WM/lesion/CSF/skull/scalp/air/BG
 uswl_def.segment.mrf        = 2;
 uswl_def.segment.cleanup    = 0;
 uswl_def.segment.imgTpm     = {fullfile(Tbx_pth,'eTPM','eTPM_wBG.nii')};
 uswl_def.segment.thrMPM     = 1;
 uswl_def.segment.ICVmsk     = 1;
 
+uswl_def.segment.biasreg    = 1e-03; % almost nothing, assuming we use MPMs
+uswl_def.segment.biasfwhm   = 60; % no bias correction
+uswl_def.segment.biaswr     = [1 1]; % Not saving bias corrected/field images
+
 % Parameters for the segmentation of masked anatomical reference (to build
 % the updated TPM)
 %==========================================================================
 uswl_def.msksegm.imgTpm     = {fullfile(spm('dir'),'tpm','eTPM.nii')};
+uswl_def.msksegm.biasreg    = 1e-03; % almost nothing, assuming we use MPMs
+uswl_def.msksegm.biasfwhm   = 60; % no bias correction
+uswl_def.msksegm.biaswr     = [0 0]; % Not saving bias corrected/field images
 
 return
 
