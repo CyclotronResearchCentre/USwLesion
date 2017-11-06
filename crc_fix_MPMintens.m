@@ -29,7 +29,9 @@ if nargin <2, opt = struct; end
 opt_o = struct(...
     'prefix', 'fx_', ...
     'strMPM', {crc_USwL_get_defaults('tMPM.strMPM')}, ...
-    'thrMPM', crc_USwL_get_defaults('tMPM.thrMPM'));
+    'thrMPM', crc_USwL_get_defaults('tMPM.thrMPM'), ...
+    'crt_mask', true, ...
+    'fix_zeros', true);
 opt = crc_check_flag(opt_o,opt);
 
 nMPM = size(fn_in,1);
@@ -45,7 +47,8 @@ for ii=1:nMPM % Loop over MPM files
     if p_mtch
         fn_tmp = char( fn_tmp , ...
             fix_MPMintens(deblank(fn_in(ii,:)), ...
-            opt.thrMPM(p_mtch), opt.prefix));
+            opt.thrMPM(p_mtch), opt.prefix, ...
+            opt.crt_mask, opt.fix_zeros));
     else
         fprintf('\nCould not fix file : %s',fn_in(ii,:))
         fn_tmp = char( fn_tmp , deblank(fn_in(ii,:)));
@@ -60,7 +63,7 @@ end
 %% SUBFUNCTIONS
 %% =======================================================================
 
-function fn_out = fix_MPMintens(fn_in,thrMPM,prefix)
+function fn_out = fix_MPMintens(fn_in,thrMPM,prefix,crt_mask,fix_zeros)
 % Make sure that MPM intensities are within [0 thrMPM] by capping the
 % values. The resulting image is written out with the prefix 't'.
 % To visually check problematic values, create an info-image of voxels that
@@ -70,8 +73,8 @@ function fn_out = fix_MPMintens(fn_in,thrMPM,prefix)
 % - 3 if equal to zero
 
 % Some flags
-crt_mask = true;
-fix_zeros = true;
+% crt_mask = true;
+% fix_zeros = true;
 sz_thr = 25e3; % arbitrary maximum size of patch to fix
 
 % Load stuff
@@ -96,15 +99,14 @@ NaboveThr = sum(dd>thrMPM);
 dd(dd>thrMPM) = thrMPM * (1 + randn(NaboveThr,1)*1e-3); % cap to max + small rand-value
 dd = reshape(dd,sz_dd);
 
+% Fix the zero-holes
 if any(dd(:)==0) && fix_zeros
     get_at_it = true;
     n_zeros = sum(dd(:)==0);
     while get_at_it
         [L,num] = spm_bwlabel(double(~dd),18);
-        n_vx = zeros(num,1);
-        for ii=1:num
-            n_vx(ii) = sum(L(:)==ii);
-        end
+        n_vx        = histc(L(:),(0:num) + 0.5);
+        n_vx        = n_vx(1:end-1);
         [sn_vx,li_cl] = sort(n_vx);
         li_cl(sn_vx>sz_thr) = [];
         sn_vx(sn_vx>sz_thr) = [];
@@ -120,7 +122,7 @@ if any(dd(:)==0) && fix_zeros
             get_at_it = false;
         else
             for i_cl = li_cl'
-                dd = fix_ith_hole(i_cl,n_vx(i_cl),L,dd,sz_dd);
+                dd = fix_ith_hole(find(L(:) == i_cl),dd,sz_dd);
             end
         end
         n_zeros_ith = sum(dd(:)==0);
@@ -132,16 +134,6 @@ if any(dd(:)==0) && fix_zeros
     end
 end
 
-% % Create map of hole-sizes
-% nL = L;
-% for ii=1:num
-%     nL(L(:)==ii) = n_vx(ii);
-% end
-% Vn = V; Vn.fname = spm_file(V.fname,'prefix','nZ2_');
-% Vn.descrip = 'number of zeros per cluster';
-% Vn = spm_create_vol(Vn);
-% Vn = spm_write_vol(Vn,nL); %#ok<*NASGU>
-
 % Save results
 Vc = V;
 Vc.fname = spm_file(V.fname,'prefix','t');
@@ -152,42 +144,74 @@ fn_out = Vc.fname;
 end
 
 %% FIXING the MPM maps for there holes (zero's) in the ICV volume
-function dd = fix_ith_hole(i_cl,ni_vx,L,dd,sz_dd)
-% i_cl = index of cluster
-% ni_vx = number of voxels in cluster
-% L = cluster indexes
-% dd = image values
-% sz_dd = image size
+function dd = fix_ith_hole(ind_vx,dd,sz_dd)
+% Input:
+% - list of voxels to be fixed in current hole
+% - data themselved
+% - data size
 
+% Define 18-neighbourhood
 neighb18 = [ ...
     1 -1 0  0 0  0 1 -1 1 -1 -1  1 -1  1 0  0  0  0 ; ...
     0  0 1 -1 0  0 1 -1 0  0  1 -1  0  0 1 -1  1 -1 ; ...
     0  0 0  0 1 -1 0  0 1 -1  0  0  1 -1 1  1 -1 -1 ]';
 
-ind_vx = find(L(:) == i_cl);
+% Numbre of voxels in hole to fill
+ni_vx = numel(ind_vx);
+
+% xyz-coordinates of voxels to fix + their 18 neighbours
 [ix,iy,iz] = ind2sub(sz_dd,ind_vx);
+ix_n0 = bsxfun(@plus,ix,neighb18(:,1)')+1;
+iy_n0 = bsxfun(@plus,iy,neighb18(:,2)')+1;
+iz_n0 = bsxfun(@plus,iz,neighb18(:,3)')+1;
 
-% get list of indexes of neighbours, check they're ok, then fix by mean
-l_neighb_ind = cell(1,ni_vx);
-for jj=1:ni_vx
-    % find xyz index
-    neighb_ind_xyz = neighb18 + ones(18,1)*[ix(jj) iy(jj) iz(jj)];
-    % remove those outside the image
-    neighb_ind_xyz( any(neighb_ind_xyz<1,2) | any(neighb_ind_xyz>ones(18,1)*sz_dd,2),:) = [];
-    % get indexes
-    l_neighb_ind{jj} = sub2ind(sz_dd,neighb_ind_xyz(:,1),neighb_ind_xyz(:,2),neighb_ind_xyz(:,3));
+% Enlarge image with zeros around 
+% -> if picking outside original image, it's a zero
+dd0 = zeros(sz_dd+2);
+dd0(2:sz_dd(1)+1,2:sz_dd(2)+1,2:sz_dd(3)+1) = dd;
+
+% Get coordinates in the extended image
+l_neighb_in = sub2ind(sz_dd+2,ix_n0,iy_n0,iz_n0);
+ind_vx_d0 = sub2ind(sz_dd+2,ix+1,iy+1,iz+1);
+
+go_ahead = true;
+while go_ahead
+    % Pick up current values in all neighbours
+    val_dd0 = reshape(dd0(l_neighb_in(:)),ni_vx,18);
+    % Count number of zeros
+    n0_val_dd0 = sum(~val_dd0,2);
     
-    % remove if one of those voxels from a zero-cluster
-    l_neighb_ind{jj}(dd(l_neighb_ind{jj})==0) = [];
-    % if more than half of possible neighbours OK -> fix with mean
-    if numel(l_neighb_ind{jj})>9
-        dd(ind_vx(jj)) = mean(dd(l_neighb_ind{jj}));
+    % Keep those with fewer zero neighbours
+    n_min = min(n0_val_dd0);
+    l_min = find(n0_val_dd0==n_min);
+    
+    % Go on or stop
+    if ni_vx==0 || n_min>8
+        go_ahead = false;
     else
-%         fprintf('PROBLEM with voxel #%d (from %d).\n',ind_vx(jj),ni_vx);
+        % do the job = fix those with mean of non-zero neighbours
+        for ii = l_min'
+            dd0(ind_vx_d0(ii)) = mean(val_dd0(ii,~~val_dd0(ii,:)));
+        end
+        % remove these fixed voxels from the list
+        ind_vx_d0(l_min) = [];
+        ni_vx = numel(ind_vx_d0);
+        l_neighb_in(l_min,:) = [];
     end
-    
+end
+
+% recover fixed image for the i_th hole
+dd = dd0(2:sz_dd(1)+1,2:sz_dd(2)+1,2:sz_dd(3)+1);
+
 end
 
 
-end
-
+% % Create map of hole-sizes
+% nL = L;
+% for ii=1:num
+%     nL(L(:)==ii) = n_vx(ii);
+% end
+% Vn = V; Vn.fname = spm_file(V.fname,'prefix','nZ2_');
+% Vn.descrip = 'number of zeros per cluster';
+% Vn = spm_create_vol(Vn);
+% Vn = spm_write_vol(Vn,nL); %#ok<*NASGU>
