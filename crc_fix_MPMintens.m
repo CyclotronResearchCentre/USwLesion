@@ -1,17 +1,24 @@
 function fn_out = crc_fix_MPMintens(fn_in,opt)
 % Function to 'fix' some issues with MPM images intensities.
-% Those values should not be negative (they're quantitiave physical values)
-% and remain below some upper limit.
-% -> take the abs-value if <0 and put a cap on values.
-% The cap depends on the image type, which is picked up based on the
-% filename, which typically ends with A, MT, R1 or R2*.
-%
+% Those values should not be negative, not be exactly zero (they're 
+% quantitiave physical values), and remain below some upper limit.
+% Proposed solution (implemented here:
+% - take the abs-value if <0
+% - put a cap on values. The cap depends on the image type (picked up based
+%   on the filename, which typically ends with A, MT, R1 or R2*).
+% - zero's are filed by averaging the vaue of non-zero neighbours.
+% 
 % INPUT
 % - fn_in   : filename of MPM images to fix
 % - opt     : option structure
-%       strMPM  : filename parts used to pick the image type
-%       thrMPM  : Max cap for the corresponding image type
-%       prefix  : prefix added to filename ('fx_' by default)
+%       strMPM   : filename parts used to pick the image type.
+%                  Def. {'_A'    '_MT'    '_R1'    '_R2'}
+%       thrMPM   : Max cap for the corresponding image type
+%                  Def. [200 5 2000 2]
+%       prefix   : prefix added to filename. Def. 'fx_'
+%       crt_mask : create a map indicating the voxels that were fixed  
+%                  Def. true
+%       fix_zeros: fix the zero-holes in the image. Def. true.
 %
 % OUTPUT
 % - fn_out  : filename of fixed MPM images
@@ -86,12 +93,6 @@ sz_dd = size(dd); dd = dd(:);
 % Generation info-image
 if crt_mask
     ll_fix = (dd<0) + (dd>thrMPM)*2 + (dd==0)*3;
-    Vf = V;
-    Vf.dt(1) = 2; % uint8
-    Vf.fname = spm_file(V.fname,'prefix',prefix);
-    Vf.descrip = 'fixed voxels, 1 if <0, 2 if >thrMPM, 3 if =0';
-    Vf = spm_create_vol(Vf);
-    Vf = spm_write_vol(Vf,reshape(ll_fix,sz_dd)); %#ok<*NASGU>
 end
 
 % Fix the image for the extreme values, <0 and >thr
@@ -145,6 +146,18 @@ if any(dd(:)==0) && fix_zeros
     end
 end
 
+% Complete info-image + save image
+if crt_mask
+    ll_fix = ll_fix + (dd(:)==0);
+    Vf = V;
+    Vf.dt(1) = 2; % uint8
+    Vf.fname = spm_file(V.fname,'prefix',prefix);
+    Vf.descrip = 'fx_vals, 1 if <0, 2 if >thrMPM, 3 if =0 fixed, 4 if =0';
+    Vf = spm_create_vol(Vf);
+    Vf = spm_write_vol(Vf,reshape(ll_fix,sz_dd)); %#ok<*NASGU>
+end
+
+
 % Save results
 Vc = V;
 Vc.fname = spm_file(V.fname,'prefix','t');
@@ -187,9 +200,7 @@ ind_vx_d0 = sub2ind(sz_dd+2,ix+1,iy+1,iz+1);
 go_ahead = true;
 while go_ahead
     % Pick up current values in all neighbours
-    val_dd0 = zeros(ni_vx,18);
-    val_dd0(:) = dd0(l_neighb_in(:));
-    
+    val_dd0 = reshape(dd0(l_neighb_in(:)),ni_vx,18);
     % Count number of zeros
     n0_val_dd0 = sum(~val_dd0,2);
     
