@@ -45,11 +45,13 @@ for ii=1:nMPM % Loop over MPM files
     end
     [~,p_mtch] = max(mtch);
     if p_mtch
+        % Do the job
         fn_tmp = char( fn_tmp , ...
             fix_MPMintens(deblank(fn_in(ii,:)), ...
             opt.thrMPM(p_mtch), opt.prefix, ...
             opt.crt_mask, opt.fix_zeros));
     else
+        % or return message
         fprintf('\nCould not fix file : %s',fn_in(ii,:))
         fn_tmp = char( fn_tmp , deblank(fn_in(ii,:)));
     end
@@ -73,9 +75,8 @@ function fn_out = fix_MPMintens(fn_in,thrMPM,prefix,crt_mask,fix_zeros)
 % - 3 if equal to zero
 
 % Some flags
-% crt_mask = true;
-% fix_zeros = true;
-sz_thr = 25e3; % arbitrary maximum size of patch to fix
+sz_thr = 25e3; % arbitrary maximum size of patch to fix -> no big holes
+% sz_thr = Inf; % arbitrary maximum size of patch to fix -> no limit
 
 % Load stuff
 V = spm_vol(fn_in);
@@ -103,6 +104,12 @@ dd = reshape(dd,sz_dd);
 if any(dd(:)==0) && fix_zeros
     get_at_it = true;
     n_zeros = sum(dd(:)==0);
+    
+    % Enlarge image with zero's around it
+    % -> if picking outside original image, it's a zero
+    dd0 = zeros(sz_dd+2);
+    dd0(2:sz_dd(1)+1,2:sz_dd(2)+1,2:sz_dd(3)+1) = dd;
+
     while get_at_it
         [L,num] = spm_bwlabel(double(~dd),18);
         n_vx        = histc(L(:),(0:num) + 0.5);
@@ -122,9 +129,13 @@ if any(dd(:)==0) && fix_zeros
             get_at_it = false;
         else
             for i_cl = li_cl'
-                dd = fix_ith_hole(find(L(:) == i_cl),dd,sz_dd);
+                dd0 = fix_ith_hole(find(L(:) == i_cl),dd0,sz_dd);
             end
         end
+        
+        % recover fixed image
+        dd = dd0(2:sz_dd(1)+1,2:sz_dd(2)+1,2:sz_dd(3)+1);
+
         n_zeros_ith = sum(dd(:)==0);
         if n_zeros == n_zeros_ith
             get_at_it = false;
@@ -143,12 +154,16 @@ fn_out = Vc.fname;
 
 end
 
-%% FIXING the MPM maps for there holes (zero's) in the ICV volume
-function dd = fix_ith_hole(ind_vx,dd,sz_dd)
+%% FIXING the MPM maps for their zero-holes in the image
+function dd0 = fix_ith_hole(ind_vx,dd0,sz_dd)
 % Input:
 % - list of voxels to be fixed in current hole
-% - data themselved
-% - data size
+% - data, extended with zeros around
+% - data size, original!
+
+% Minimal number of non-zero neighbours for the averaging
+min_nz = 10; % -> the larger the more restrictive the filling.
+max_zeros = 18-min_nz;
 
 % Define 18-neighbourhood
 neighb18 = [ ...
@@ -161,14 +176,9 @@ ni_vx = numel(ind_vx);
 
 % xyz-coordinates of voxels to fix + their 18 neighbours
 [ix,iy,iz] = ind2sub(sz_dd,ind_vx);
-ix_n0 = bsxfun(@plus,ix,neighb18(:,1)')+1;
-iy_n0 = bsxfun(@plus,iy,neighb18(:,2)')+1;
-iz_n0 = bsxfun(@plus,iz,neighb18(:,3)')+1;
-
-% Enlarge image with zeros around 
-% -> if picking outside original image, it's a zero
-dd0 = zeros(sz_dd+2);
-dd0(2:sz_dd(1)+1,2:sz_dd(2)+1,2:sz_dd(3)+1) = dd;
+ix_n0 = bsxfun(@plus,ix,neighb18(:,1)')+1; % \
+iy_n0 = bsxfun(@plus,iy,neighb18(:,2)')+1; % |- xyz coord in extended data
+iz_n0 = bsxfun(@plus,iz,neighb18(:,3)')+1; % /
 
 % Get coordinates in the extended image
 l_neighb_in = sub2ind(sz_dd+2,ix_n0,iy_n0,iz_n0);
@@ -177,7 +187,9 @@ ind_vx_d0 = sub2ind(sz_dd+2,ix+1,iy+1,iz+1);
 go_ahead = true;
 while go_ahead
     % Pick up current values in all neighbours
-    val_dd0 = reshape(dd0(l_neighb_in(:)),ni_vx,18);
+    val_dd0 = zeros(ni_vx,18);
+    val_dd0(:) = dd0(l_neighb_in(:));
+    
     % Count number of zeros
     n0_val_dd0 = sum(~val_dd0,2);
     
@@ -186,13 +198,12 @@ while go_ahead
     l_min = find(n0_val_dd0==n_min);
     
     % Go on or stop
-    if ni_vx==0 || n_min>8
+    if ni_vx==0 || n_min>max_zeros
         go_ahead = false;
     else
         % do the job = fix those with mean of non-zero neighbours
-        for ii = l_min'
-            dd0(ind_vx_d0(ii)) = mean(val_dd0(ii,~~val_dd0(ii,:)));
-        end
+        dd0(ind_vx_d0(l_min)) = sum(val_dd0(l_min,:),2)./(18-n0_val_dd0(l_min));
+        
         % remove these fixed voxels from the list
         ind_vx_d0(l_min) = [];
         ni_vx = numel(ind_vx_d0);
@@ -200,11 +211,7 @@ while go_ahead
     end
 end
 
-% recover fixed image for the i_th hole
-dd = dd0(2:sz_dd(1)+1,2:sz_dd(2)+1,2:sz_dd(3)+1);
-
 end
-
 
 % % Create map of hole-sizes
 % nL = L;
