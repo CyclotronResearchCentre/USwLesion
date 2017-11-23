@@ -132,7 +132,7 @@ end
 % - then grow volume by nDilate voxel(s) -> creates on the drive dt_Msk
 [fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minVol,opt.nDilate);
 
-%% 2. Apply the lesion mask on the reference structural images -> k_sRef
+% %% 2. Apply the lesion mask on the reference structural images -> k_sRef
 fn_kMTw = spm_file(fn_in{2},'prefix','k');
 Vi(1) = spm_vol(fn_in{2});
 Vi(2) = spm_vol(fn_dtMsk);
@@ -263,10 +263,10 @@ fn_mwCimg = spm_select('FPList',pth, ...  % modulated warped
 % When using BG, i.e. extended TPM, then recombine GM with BG
 %  -> add c8 onto c1 -> only 1 image (c1) with GM + c8 with BG.
 if numel(NbGaussian)==8
-    add_2_images(fn_Cimg([1 end],:),  fn_Cimg(1,:), 2); % uint8
-    add_2_images(fn_rCimg([1 end],:), fn_rCimg(1,:), 16); % float32
-    add_2_images(fn_wCimg([1 end],:), fn_wCimg(1,:), 2); % uint8
-    add_2_images(fn_mwCimg([1 end],:), fn_mwCimg(1,:), 16); % float32
+    add_2_images(fn_Cimg([1 end],:));
+    add_2_images(fn_rCimg([1 end],:));
+    add_2_images(fn_wCimg([1 end],:));
+    add_2_images(fn_mwCimg([1 end],:));
 end
 
 % Rebuild ICV mask from latest segmentation, with some cleaning up
@@ -282,14 +282,14 @@ fn_wICV = deblank(fn_icv_out(2,:));
 % Apply mask on GM, WM, Lesion and CSF (+BG if there)
 for ii=1:4
     mask_img(fn_Cimg(ii,:),fn_ICV,'');
-    mask_img(fn_rCimg(ii,:),fn_ICV,'');
+%     mask_img(fn_rCimg(ii,:),fn_ICV,''); % not messing up header!
     mask_img(fn_wCimg(ii,:),fn_wICV,'');
     mask_img(fn_mwCimg(ii,:),fn_wICV,'');
 end
 
 if numel(NbGaussian)==8
     mask_img(fn_Cimg(end,:),fn_ICV,'');
-    mask_img(fn_rCimg(end,:),fn_ICV,'');
+%     mask_img(fn_rCimg(end,:),fn_ICV,''); % not messing up header!
     mask_img(fn_wCimg(end,:),fn_wICV,'');
     mask_img(fn_mwCimg(end,:),fn_wICV,'');
 end
@@ -328,9 +328,10 @@ if ~isempty(fn_in{4})
 end
 clear matlabbatch
 
-if options.biaswr(2) % bias image corrected image screated
-    fn_img2warp = {spm_file(fn_img2warp{1},'prefix','m')};
-end
+% TO BE FIXED -> deal with case of bias modulated images!!!
+% if options.biaswr(2) % bias image corrected image screated
+%     fn_img2warp = {spm_file(fn_img2warp{1},'prefix','m')};
+% end
 
 [matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp);
 spm_jobman('run', matlabbatch);
@@ -410,7 +411,7 @@ fn_out.segmImg.mwc4 = {deblank(fn_mwCimg(4,:))}; % modulated warped CSF
 if options.thrLesion ~= 0
     crc_lesion_cleanup(fn_out.segmImg.c3,options.thrLesion);
 end
-
+% fn_out = {};
 end
 
 % =======================================================================
@@ -447,7 +448,7 @@ if max(Msk(:))>1 || min(Msk(:))<0
     fprintf('WARNING: some bad values in the lesion mask!\n')
     fprintf('\tValue range : [%1.4f %1.4f] -> Setting it to [0 1]\n', ...
         min(Msk(:)), max(Msk(:)))
-    Msk(Msk>1e-6) = 1; % non-zero values, as in >1e-6, set to 1
+    Msk(Msk>.5) = 1; % non-zero values, as in >1e-6, set to 1
     Msk(Msk<0) = 0; % anything below zero set to zero.
 end
 
@@ -558,7 +559,7 @@ matlabbatch{4}.spm.spatial.normalise.write.subj.def(1) = cfg_dep('Segment: Forwa
 matlabbatch{4}.spm.spatial.normalise.write.subj.resample(1) = cfg_dep('Named File Selector: LesionMask(1) - Files', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{1}));
 matlabbatch{4}.spm.spatial.normalise.write.woptions.bb = [-90 -126 -72 ; 90 90 108];
 matlabbatch{4}.spm.spatial.normalise.write.woptions.vox = [1.5 1.5 1.5];
-matlabbatch{4}.spm.spatial.normalise.write.woptions.interp = 1; % Only trilinear interpolation
+matlabbatch{4}.spm.spatial.normalise.write.woptions.interp = 1; % 1 -> trilinear, 0 -> NN
 matlabbatch{5}.spm.spatial.smooth.data(1) = cfg_dep('Normalise: Write: Normalised Images (Subj 1)', substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('()',{1}, '.','files'));
 matlabbatch{5}.spm.spatial.smooth.fwhm = smoKern*[1 1 1];
 matlabbatch{5}.spm.spatial.smooth.dtype = 16;
@@ -596,7 +597,7 @@ if Ntpm_o==6
     % Standard TPM
     tpm_std = true;
 elseif Ntpm_o==7
-    % Special TPM for MPM (with BG)
+    % Special TPM for MPM (with separate GM class for subcortical areas)
     tpm_std = false;
 else
     error('Wrong number of TPM''s.');
@@ -656,7 +657,8 @@ prob_l_possible = double(prob_l_possible)/255;
 % 2) ensure minium value all over
 % 3) concatenate by setting lesion at last position & adjust 'other' class
 tpm_Lu = (1-1/opt.tpm_ratio)*tpm_l.*tpm_healthy; % update lesion tpm
-l_les_possible = find( (prob_l_possible(:)*opt.min_tpm_icv>tpm_Lu(:)) & (prob_l_possible(:)>0) );
+l_les_possible = find( (prob_l_possible(:)*opt.min_tpm_icv>tpm_Lu(:)) ...
+                     & (prob_l_possible(:)>0) );
 tpm_Lu(l_les_possible) = prob_l_possible(l_les_possible)*opt.min_tpm_icv; % min_tpm_icv x prob of possible lesion
 tpm_Lu(tpm_Lu<opt.min_tpm) = opt.min_tpm; % at least min_tpm everywhere
 tpm_ext = cat(4,tpm_orig,tpm_Lu); % put lesion at the end
@@ -891,15 +893,27 @@ matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 4;
 end
 
 %% ADDING 2 IMAGES TOGETHER
-function add_2_images(fn_in,fn_out,dtype)
+function add_2_images(fn_in)
 % Adding 2 images together
 % No checking whatsoever!
-Vi = spm_vol(fn_in);
-Vo = spm_vol(fn_out);
-fl.dtype = dtype;
-Vo = spm_imcalc(Vi, Vo, 'i1+i2' ,fl);
+% Deal with sum through the nifti object -> save in 1st one
+% Why ?
+% -> preserves crucial orientation info in rc* files for Dartel
+% -> much faster than ImCalc
+V1 = spm_vol(fn_in(1,:));
+V2 = spm_vol(fn_in(2,:));
+V1.private.dat(:,:,:) = V1.private.dat(:,:,:) + V2.private.dat(:,:,:);
 
 end
+
+% function add_2_images(fn_in,fn_out,dtype)
+% Adding 2 images together
+% No checking whatsoever!
+% Vi = spm_vol(fn_in);
+% Vo = spm_vol(fn_out);
+% fl.dtype = dtype;
+% Vo = spm_imcalc(Vi, Vo, 'i1+i2' ,fl);
+% end
 
 %% MASKING AN IMAGE
 function fn_kimg = mask_img(fn_img,fn_msk,prefix)

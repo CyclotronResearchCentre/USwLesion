@@ -37,8 +37,8 @@ uswl_def.segment.biaswr     = [1 1]; % Not saving bias corrected/field images
 % the updated TPM)
 %==========================================================================
 uswl_def.msksegm.imgTpm     = {fullfile(spm('dir'),'tpm','eTPM.nii')};
-uswl_def.msksegm.biasreg    = 1e-03; % almost nothing, assuming we use MPMs
-uswl_def.msksegm.biasfwhm   = 60; % no bias correction
+uswl_def.msksegm.biasreg    = 1e-03; % small regularisation
+uswl_def.msksegm.biasfwhm   = 60; % some bias correction
 uswl_def.msksegm.biaswr     = [0 0]; % Not saving bias corrected/field images
 
 return
