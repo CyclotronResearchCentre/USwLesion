@@ -53,7 +53,7 @@
 %% DEFINE a few filenames & parameters
 fn_TPM = 'eTPM.nii';
 fn_atlas = 'labels_Neuromorphometrics.nii';
-fn_bg = 'msk_basalganglia.nii';
+% fn_bg = 'msk_basalganglia.nii';
 fn_brainp = 'msk_BrainParts.nii';
 % where #2 = cortical GM+WM, #3 = subcortex, #4 = cerebellum, #5 =
 % subcortex without BG, #6 = Basal Ganglia only.
