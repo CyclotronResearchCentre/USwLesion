@@ -1,4 +1,4 @@
-function fn_out = crc_ExtractParam_MPMs(fn_img,opt)
+function [fn_out,res] = crc_ExtractParam_qMRIs(fn_img,opt)
 % Extracting parameters from the segmented images.
 %
 % Which parameters should extracted?
@@ -23,16 +23,56 @@ function fn_out = crc_ExtractParam_MPMs(fn_img,opt)
 %       .fn_MskLes : original lesion mask [optional]
 % - opt    : structure with some options
 %       .outdir    : output directory
+%       .subj_Id   : subject Id for the filename of saved parameters
 %       .thrICV    : threshold for the creation of the tICV mask [def .5]
 %       .thrLesion : lesion map threshold, for match with lesion mask
-%       .thrTC     :
-%       .lBrParts  :
+%       .thrTC     : tissue class threshold, for value collection
 %
 % OUTPUT
-% - fn_out  : filename of output matlab file with structure containing the
-%             following fields
+% - fn_out  : filename of output matlab file with result structure
+% - res     : result structure (the one saved) with the fields
+%      .Picv         : filename of final ICV mask used for tICV calculation
+%      .match        : struct for the matching between lesion mask and
+%                      segmented lesion
+%           .DiceC      : Dice coefficient
+%           .JaccardI   : Jaccard index
+%           .N_tmsk     : #voxels in lesion mask
+%           .N_c3       : #voxels in segmented lesion
+%           .N_intersec : #voxels in both segmented and lesion mask
+%           .N_union    : #voxels in segmented and/or lesion mask
+%      .tissueVol    : structu with volumic information (in liter or %)
+%           .volumes    : volumes of 3 or 4 tissue classes
+%           .tiv        : total intra cranial volume
+%           .gmv        : total GM volume
+%           .wmv        : total WM volume (normal appearing and lesion)
+%           .lesv       : total lesion volume
+%           .BrParenchFrac : Brain Parenchymal Fraction over TIV
+%           .GMFrac     : GM fraction over TIV
+%           .WMFrac     : WM fraction over TIV
+%           .LesFrac    : Lesion fraction over TIV
+%           .LesFracWM  : Lesion fraction over WM volume
+%      .values_qMRI  : values extracted from the qMRIs in tisue classes and
+%                      specific brain parts
+%           .val_labels : labels of tissue class and brain part, typically
+%                         'GM cortical', 'GM central','WM cortical', and
+%                         'Lesion'
+%           .val_qMRI   : extracted values 1 cell per label. Each cell
+%                         contains an array of size [#voxels x #qMRIs]
+%           .fn_qMRI    : filename of qMRI files used
+%      .sSstats_qMRI :
+%           .sstats_label : labels of summary statistics values
+%           .sstats_qMRI  : values of summary statistics 1 cell per value 
+%                          label. Each cell contains an array of size 
+%                          [#sstats x #qMRIs]
+%           .val_labels   : labels of tissue class and brain part, 
+%                           typically 'GM cortical', 'GM central','WM 
+%                           cortical', and 'Lesion'
+%           .fn_qMRI      : filename of qMRI files used
 %
 %
+% TO DO:
+% Check the values picked up from qMRI in each tissue class & brain part???
+% 
 % REFS:
 % tICV : http://www.sciencedirect.com/science/article/pii/S1053811914007769
 %__________________________________________________________________________
@@ -105,7 +145,7 @@ end
 % - TIV
 % - GMV = Cortical and Deep Grey matter
 % - WMV = NAWM + lesions
-% - Brain Parenchymal Fraction= (GMV+WMV)/TIV
+% - Brain Parenchymal Fraction = (GMV+WMV)/TIV
 % - Grey Matter Fraction = GMV/TIV
 % - White Matter Fraction =  WMV/TIV
 % - Lesion Fraction = Lesion volume/TIV (more standard than relative than
@@ -117,7 +157,7 @@ clear matlabbatch
 matlabbatch{1}.spm.util.tvol.matfiles = {fn_seg8};
 matlabbatch{1}.spm.util.tvol.tmax = ncImg;
 matlabbatch{1}.spm.util.tvol.mask = {fullfile(spm('dir'),'tpm','mask_ICV.nii,1')};
-matlabbatch{1}.spm.util.tvol.outf = fullfile(pth_out,['TV_',fn]);
+% matlabbatch{1}.spm.util.tvol.outf = fullfile(pth_out,['TV_',fn]);
 spm_jobman('run', matlabbatch);
 tmp = load(fn_seg8);
 volumes = tmp.volumes;
@@ -138,7 +178,7 @@ if ncImg ==4
     LesFracWM = volumes.litres(3)/wmv*100; % expressed in percentage
 end
       
-lesionVol = struct(...
+tissueVol = struct(...
     'volumes', volumes.litres, ...
     'tiv', tiv, ...
     'gmv', gmv, ...
@@ -147,26 +187,26 @@ lesionVol = struct(...
     'GMFrac', GMFrac, ...
     'WMFrac', WMFrac);
 if ncImg ==4
-    lesionVol.lesv = lesv;
-    lesionVol.LesFrac = LesFrac;
-    lesionVol.LesFracWM = LesFracWM;
+    tissueVol.lesv = lesv;
+    tissueVol.LesFrac = LesFrac;
+    tissueVol.LesFracWM = LesFracWM;
 end
 
 % Store in main results structure
-res.lesionVol = lesionVol;
+res.tissueVol = tissueVol;
 
 %% 4. extraction of MPM values for the GM/WM(/lesion)
 % Accounting for the brain parts selected.
 
 % Some definitions & pre-loading
 val_qMRI = cell(1,ncImg);
-val_labels = {'GM cortical', 'GM central','WM cortical'};
+val_labels = char('GM cortical', 'GM central','WM cortical');
 if ncImg==4
-    val_labels{end+1} = 'Lesion';
+    val_labels = char(val_labels,'Lesion');
 end
 nqMRI = size(fn_qMRI,1);
 VqMRI = spm_vol(fn_qMRI);
-tval_c123 = zeros(prod(Vmpm(1).dim),ncImg);
+tval_c123 = zeros(prod(VqMRI(1).dim),ncImg);
 
 % Brain Parts mask into subject subject space
 %--------------------------------------------
@@ -205,120 +245,83 @@ tval_c1 = val_c1(:)>=opt.thrTC; % Keep voxel with p>= thr
 XYZvx_msk = Vmsk_cortex.mat\[XYZmm ; ones(1,numel(tval_c1))];
 % cortical
 val_BPcortex = spm_sample_vol(Vmsk_cortex,XYZvx_msk(1,:)',XYZvx_msk(2,:)',XYZvx_msk(3,:)',1);
-% tval_c1_cortex = tval_c1 .* val_BPcortex>=.5;
 tval_c123(:,1) = tval_c1 .* val_BPcortex>=.5;
 % central
 val_BPcentral = spm_sample_vol(Vmsk_central,XYZvx_msk(1,:)',XYZvx_msk(2,:)',XYZvx_msk(3,:)',1);
-% tval_c1_central = tval_c1 .* val_BPcentral>=.5;
 tval_c123(:,2) = tval_c1 .* val_BPcentral>=.5;
 
 % WM, c2
 Vc2 = spm_vol(fn_cImg(2,:));
 val_c2 = spm_read_vols(Vc2);
 tval_c2 = val_c2(:)>=opt.thrTC;
-% tval_c2_cortex = tval_c2 .* val_BPcortex>=.5;
 tval_c123(:,3) = tval_c2 .* val_BPcortex>=.5;
 
 % Lesion, c3
 if ncImg==4
     Vc3 = spm_vol(fn_cImg(3,:));
     val_c3 = spm_read_vols(Vc3);
-%     tval_c3 = val_c3(:)>=opt.thrTC;
     tval_c123(:,4) = val_c3(:)>=opt.thrTC;
+end
+tval_c123 = logical(round(tval_c123));
+
+% Initialize values to NaN -> check after if some values not defined!
+for i_tcBP = 1:ncImg
+    val_qMRI{i_tcBP} = zeros(sum(tval_c123(:,i_tcBP)),nqMRI) + NaN;
 end
 
 % Load qMRI values, loop over qMRIs and tissue class per brain part
 for j_qMRI = 1:nqMRI
     val_qMRI_i = spm_read_vols(VqMRI(j_qMRI));
+    val_qMRI_i = val_qMRI_i(:);
     for i_tcBP = 1:ncImg
         val_qMRI{i_tcBP}(:,j_qMRI) = val_qMRI_i(tval_c123(:,i_tcBP));
     end
 end
 
-a=2;
-
-
-
-% XYZvx_msk = Vmsk_cortex.mat\[XYZmm(:,tval_c1) ; ones(1,sum(tval_c1))];
-% val_BPcortex = spm_sample_vol(Vmsk_cortex,XYZvx_msk(1,:),XYZvx_msk(2,:),XYZvx_msk(3,:),1);
-% lGM = find(val_c1>=opt.thrTC);
-% XYZvx_msk = Vmsk_cortex.mat\[XYZmm(:,lGM) ; ones(1,numel(lGM))];
-% val_BPcortex = spm_sample_vol(Vmsk_cortex,XYZvx_msk(1,:),XYZvx_msk(2,:),XYZvx_msk(3,:),1);
-
-
-
-
-
-nMPM = size(fn_MPM,1);
-Vmpm = spm_vol(fn_MPM);
-if ~isempty(fn_MPMmsk)
-    nMsk = size(fn_MPMmsk,1);
-    if nMsk ~= nMPM
-        error('USwL:ExParam','Num MPM images (%d) ~= Num Msk images (%d)', nMPM,nMsk);
-    end
-    Vmsk = spm_vol(fn_MPMmsk);
-else
-    nMsk = 0;
-end
-
-Vtc = spm_vol(fn_cImg);
-v_tc123 = spm_read_vols(Vtc(1:3));
-vt_tc123 = v_tc123 > opt.thrTC ;
-
-vMPM = cell(3,1); % #tissue classes x #MPM
-if nMsk
-    vMPMmsk = cell(3,1);
-    v_msk = spm_read_vols(Vmsk);
-    v_msk = ~sum(v_msk,4);
-end
-for ii=1:nMPM
-    v_mpm = spm_read_vols(Vmpm(ii));
-    v_mpm = v_mpm(:);
-    for jj=1:3 % tc
-        tmp = vt_tc123(:,:,:,jj);
-        vMPM{jj}(:,ii) = v_mpm(tmp(:));
-        if nMsk
-            tmp = tmp & v_msk;
-            vMPMmsk{jj}(:,ii) = v_mpm(tmp(:));
-        end
-    end
-end
-res.vMPM = vMPM; %#ok<*STRNU>
-if nMsk
-    res.vMPMmsk = vMPMmsk; %#ok<*STRNU>
-end
+% Stacking things into result strucutre
+values_qMRI = struct(...
+    'val_labels', {val_labels}, ...
+    'val_qMRI', {val_qMRI}, ...
+    'fn_qMRI', fn_qMRI);
+res.values_qMRI = values_qMRI;
 
 %% 5. some stats from the MPM values
-% Find min-max, mean, median, std, skewness ,kurtosis for each MPM
-mM = zeros(nMPM,2); mM(:,1) = Inf; mM(:,2) = -Inf;
-meanVal = zeros(3,nMPM); medVal = zeros(3,nMPM); stdVal = zeros(3,nMPM);
-skewVal = zeros(3,nMPM); kurtVal = zeros(3,nMPM);
-if nMsk
-    v_use = res.vMPMmsk;
-else
-    v_use = res.vMPM;
-end
-for ii=1:3 % tc
-    for jj=1:nMPM % mpm
-        % min/max total
-        tmp_m = min(v_use{ii}(:,jj));
-        if tmp_m<mM(jj,1), mM(jj,1) = tmp_m; end
-        tmp_M = max(v_use{ii}(:,jj));
-        if tmp_M>mM(jj,2), mM(jj,2) = tmp_M; end
-        % mean/meadian/std/skewness/kurtosis
-        meanVal(ii,jj) = mean(v_use{ii}(:,jj));
-        medVal(ii,jj) = median(v_use{ii}(:,jj));
-        stdVal(ii,jj) = std(v_use{ii}(:,jj));
-        skewVal(ii,jj) = skewness(v_use{ii}(:,jj));
-        kurtVal(ii,jj) = kurtosis(v_use{ii}(:,jj))-3;
+% Find the following summary statistic for intensities in each qMRI in 
+% each tissue class per brain part:
+% mean, median, std, P10, P90, min, max, skewness ,kurtosis 
+
+sstats_qMRI = cell(1,ncImg); % same labels as at point 4.
+% val_labels = char('GM cortical', 'GM central','WM cortical');
+% if ncImg==4
+%     val_labels = char(val_labels,'Lesion');
+% end
+sstats_label = char('mean', 'median', 'std', 'P10', 'P90', ...
+    'min', 'max', 'skewness' ,'kurtosis');
+nsstats = size(sstats_label,1);
+
+for i_tcBP = 1:ncImg
+    sstats_qMRI{i_tcBP} = zeros(nsstats,nqMRI)+NaN;
+    for j_qMRI = 1:nqMRI
+        sstats_qMRI{i_tcBP}(:,j_qMRI) = ...
+            get_sstats(val_qMRI{i_tcBP}(:,j_qMRI),sstats_label);
     end
 end
-res.vMPMstats = struct('mM',mM,'meanVal',meanVal,'medVal',medVal,...
-    'stdVal',stdVal,'skewVal',skewVal,'kurtVal',kurtVal);
+
+sSstats_qMRI = struct( ...
+    'sstats_qMRI', {sstats_qMRI}, ...
+    'sstats_label', {sstats_label}, ...
+    'val_labels', {val_labels}, ...
+    'fn_qMRI', fn_qMRI);
+
+res.sSstats_qMRI = sSstats_qMRI;
 
 %% 6. save things and pass out fn_out
-fn_out.fn_ExParam = fullfile(pth_out,['ExP_',fn]);
-save(fn_out.fn_ExParam,'res');
+if isfield(opt,'subj_Id') && ~isempty(opt.subj_Id)
+    fn_out = fullfile(pth_out,['ExP_',opt.subj_Id]);
+else
+    fn_out = fullfile(pth_out,['ExP_',fn]);
+end
+save(fn_out,'res');
 
 
 end
@@ -381,15 +384,45 @@ p_min = -V_subj.mat\[0 0 0 1]' ; p_min = p_min(1:3);
 p_max = (V_subj.dim.*vx_sz)' + p_min ;
 img_bb = round([-abs(p_min') ; abs(p_max')]);
 
-% % Bring in SPM-ICV into subject space
-% fn_icvSPM = fullfile(spm('dir'),'tpm','mask_ICV.nii');
-% fn_icvSPM_loc = fullfile(spm_file(fn_iwarp,'path'),'icv_SPM.nii');
-% copyfile(fn_icvSPM,fn_icvSPM_loc)
-
 matlabbatch{1}.spm.spatial.normalise.write.subj.def(1) = {spm_file(fn_iwarp,'number','')};
 matlabbatch{1}.spm.spatial.normalise.write.subj.resample = cellstr(fn_brP);
 matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = img_bb;
 matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = vx_sz;
 matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 1;
+
+end
+
+% =======================================================================
+function sstats_v = get_sstats(val,labels)
+% extracting the summary statistics from a bunch of voxel values, based on
+% the labels of the values requested.
+% Dealing with mean, median, std, P10, P90, min, max, skewness ,kurtosis.
+
+nlabels = size(labels,1);
+sstats_v = zeros(nlabels,1)+NaN;
+for ii=1:nlabels
+    switch lower(deblank(labels(ii,:)))
+        case 'mean'
+            sstats_v(ii) = mean(val);
+        case 'median'
+            sstats_v(ii) = median(val);
+        case 'std'
+            sstats_v(ii) = std(val);
+        case 'p10'
+            sstats_v(ii) = prctile(val,10);
+        case 'p90'
+            sstats_v(ii) = prctile(val,90);
+        case 'min'
+            sstats_v(ii) = min(val);
+        case 'max'
+            sstats_v(ii) = max(val);
+        case 'skewness'
+            sstats_v(ii) = skewness(val);
+        case 'kurtosis'
+            sstats_v(ii) = kurtosis(val);
+        otherwise
+            fprintf('\nCould not find operation : ''%s''',deblank(labels(ii,:)))
+    end
+end
 
 end
