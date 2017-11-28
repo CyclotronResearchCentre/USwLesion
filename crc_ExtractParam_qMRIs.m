@@ -200,7 +200,7 @@ res.tissueVol = tissueVol;
 
 % Some definitions & pre-loading
 val_qMRI = cell(1,ncImg);
-val_labels = char('GM cortical', 'GM central','WM cortical');
+val_labels = char('GMcortical', 'GMcentral','WMcortical');
 if ncImg==4
     val_labels = char(val_labels,'Lesion');
 end
