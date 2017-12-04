@@ -41,6 +41,7 @@ uswl_def.segment.ICVmsk     = 1;
 uswl_def.segment.thrLesion  = 0;
 uswl_def.segment.mrf        = 2;
 uswl_def.segment.cleanup    = 1;
+uswl_def.segment.scDefReg   = 1; % scaling of warping regularisation, <1 -> more freedom
 
 % Parameters for the segmentation of masked anatomical reference (to build
 % the updated TPM)
@@ -53,6 +54,7 @@ uswl_def.msksegm.NbGaussian = [2 2 2 3 4 4]; % GM/WM/CSF/skull/scalp/air
 uswl_def.msksegm.mrf        = 2;
 uswl_def.msksegm.cleanup    = 1;
 uswl_def.msksegm.native     = [[1 0];[1 0];[1 0];[0 0];[0 0];[0 0]]; 
+uswl_def.msksegm.scDefReg   = 1; % scaling of warping regularisation, <1 -> more freedom
 
 % Processing parameters for the creation of the updated TPM
 %==========================================================================

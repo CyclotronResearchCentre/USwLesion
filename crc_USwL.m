@@ -72,6 +72,19 @@ function fn_out = crc_USwL(fn_in,options)
 % Cyril Pernet updated few bits to work with no MPM images + added structural
 % normalization and N Gaussians - Edinburgh Imaging, The University of Edinburgh
 
+% 
+% % TESTING parfor
+% nG = options.NbGaussian;
+% opt = crc_USwL_get_defaults('uTPM');
+% scDefReg = crc_USwL_get_defaults('msksegm.scDefReg');
+% 
+% fprintf('\nSubject %s: nDil = %d, nG_c3 = %d, ScalReg = %1.1g\n', ...
+%     spm_file(fn_in{1},'basename'),opt.nDilate, nG(3), scDefReg);
+% fn_out = {};
+% 
+% return
+% 
+
 %% Input data
 % fn_in{1} = Mask image
 % fn_in{2} = structural reference
@@ -147,11 +160,13 @@ Vo = spm_imcalc(Vi,Vo,'i1.*(((i2>.5)-1)./((i2>.5)-1))');
 % masked for the lesion, i.e. "cost function masking" approach.
 clear matlabbatch
 fn_tpm_msksegm = crc_USwL_get_defaults('msksegm.imgTpm');
+scDefReg = crc_USwL_get_defaults('msksegm.scDefReg');
 matlabbatch = batch_normalize_smooth( ...
     fn_kMTw, ... % masked structural image used for the warping estimation
     fn_tMsk, ... % cleaned up lesion mask to be warped into MNI
     fn_tpm_msksegm{1}, ... % filename of tissue probability map
-    opt.smoKern); % smoothing applied on the normalized lesion mask -> new prior
+    opt.smoKern , ... % smoothing applied on the normalized lesion mask -> new prior
+    scDefReg); % scaling of warp regularisation
 spm_jobman('run', matlabbatch);
 fn_swtMsk = spm_file(fn_tMsk,'prefix','sw'); % smooth normalized lesion mask
 fn_wtMsk = spm_file(fn_tMsk,'prefix','w'); %#ok<*NASGU> % normalized lesion mask
@@ -241,12 +256,14 @@ switch options.img4US
         %         end
 end
 
+scDefReg = crc_USwL_get_defaults('segment.scDefReg');
 opt_segm = struct( ...
     'b_param', [options.biasreg options.biasfwhm], ...
     'b_write', options.biaswr, ...
     'nGauss', NbGaussian, ...
     'mrf', options.mrf, ...
-    'cleanup', options.cleanup);
+    'cleanup', options.cleanup, ...
+    'scDefReg', scDefReg);
 
 clear matlabbatch
 [matlabbatch] = batch_segment_l(fn_Img2segm, fn_TPMl, opt_segm);
@@ -488,6 +505,8 @@ fn_tMsk = V_nM.fname;
 % 5) dilate mask
 if nDilate
     dMsk_nM = imdilate(~~Msk_nM,ones(3,3,3));
+else
+    dMsk_nM = ~~Msk_nM;
 end
 if nDilate>1
     for ii=1:nDilate-1
@@ -510,8 +529,8 @@ end
 %   + normalize the masked structural image
 %   + generate an ICV mask
 
-function matlabbatch = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
-% matlabbatch = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
+function matlabbatch = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern,scDefReg)
+% matlabbatch = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern,scDefReg)
 % This batch includes:
 % [1,2] defining inputs
 % [3] segmentation of the masked structural
@@ -522,6 +541,7 @@ function matlabbatch = batch_normalize_smooth(fn_kRef,fn_tMsk,fn_TPM,smoKern)
 % - fn_tMsk : cleaned up lesion mask to be warped into MNI
 % - fn_TPM  : filename of tissue probability map
 % - smoKern : smoothing applied on the normalized lesion mask -> new prior
+% - scDefReg: scaling of default warping regularisation
 %
 % OUTPUT:
 % - matlabbatch : operation batch
@@ -550,7 +570,7 @@ for ii=1:6
 end
 matlabbatch{3}.spm.spatial.preproc.warp.mrf = segm_def.mrf;
 matlabbatch{3}.spm.spatial.preproc.warp.cleanup = segm_def.cleanup; %% the cleanup is ad-hoc by default leave 1
-matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
+matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2]*scDefReg; 
 matlabbatch{3}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{3}.spm.spatial.preproc.warp.fwhm = 0;
 matlabbatch{3}.spm.spatial.preproc.warp.samp = 3;
@@ -574,6 +594,8 @@ end
 % i.e. between WM and CSF!
 function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 % fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
+% 
+% Implicit smoothing is 4mm!!!
 %
 % INPUT
 % - opt : structure with a few parameters
@@ -620,7 +642,6 @@ switch opt.tpm4lesion
     case 0 % GM only
         tpm_healthy = tpm_GM;
         msk_les_possible = (tpm_GM>=tpm_WM) & (tpm_GM>=tpm_CSF);
-        
     case 1 % WM only
         tpm_healthy = tpm_WM;
         msk_les_possible = (tpm_WM>=tpm_GM) & (tpm_WM>=tpm_CSF);
@@ -794,6 +815,7 @@ function [matlabbatch] = batch_segment_l(P,Ptpm_l,opt)
 %   . nGauss  : Number of Gaussians per tissue class
 %   . mrf     : mrf parameter
 %   . cleanup : cleanup parameter
+%   . scDefReg: scaling of default warping regularisation
 
 % Multiple channels & number of tissue classes
 nP = size(P,1);
@@ -845,7 +867,7 @@ matlabbatch{1}.spm.spatial.preproc.warp.mrf = opt.mrf;
 matlabbatch{1}.spm.spatial.preproc.warp.cleanup = opt.cleanup;
 % matlabbatch{1}.spm.spatial.preproc.warp.mrf = 0;
 % matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 0;
-matlabbatch{1}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
+matlabbatch{1}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2]*opt.scDefReg;
 matlabbatch{1}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{1}.spm.spatial.preproc.warp.fwhm = 0;
 matlabbatch{1}.spm.spatial.preproc.warp.samp = 3;
