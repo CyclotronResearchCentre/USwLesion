@@ -27,6 +27,7 @@ function [fn_out,res] = crc_ExtractParam_qMRIs(fn_img,opt)
 %       .thrICV    : threshold for the creation of the tICV mask [def .5]
 %       .thrLesion : lesion map threshold, for match with lesion mask
 %       .thrTC     : tissue class threshold, for value collection
+%       .prefix    : prefix added to the filename [def. empty]
 %
 % OUTPUT
 % - fn_out  : filename of output matlab file with result structure
@@ -87,7 +88,7 @@ fn_qMRI  = fn_img.fn_qMRI;
 fn_seg8 = fn_img.fn_seg8;
 fn_iwarp = fn_img.fn_iwarp;
 
-if isfield(fn_img,'fn_MskLes')
+if isfield(fn_img,'fn_MskLes') && ~isempty(fn_img.fn_MskLes)
     fn_MskLes  = fn_img.fn_MskLes;
     MskLes_match = true;
 else
@@ -96,10 +97,16 @@ else
 end
 
 [pth,fn] = spm_fileparts(fn_qMRI(1,:));
-if isempty(opt.outdir)
+if ~isfield(opt,'prefix')|| isempty(opt.outdir)
     pth_out = pth;
 else
     pth_out = opt.outdir;
+end
+
+if ~isfield(opt,'prefix') || isempty(opt.prefix)
+    fn_prefix = '';
+else
+    fn_prefix = [opt.prefix,'_'];
 end
 
 %% 1. build ICV from the sum of GM, WM, CSF and lesion
@@ -321,6 +328,7 @@ if isfield(opt,'subj_Id') && ~isempty(opt.subj_Id)
 else
     fn_out = fullfile(pth_out,['ExP_',fn]);
 end
+fn_out = spm_file(fn_out,'prefix',fn_prefix);
 save(fn_out,'res');
 
 
