@@ -85,7 +85,8 @@ function fn_out = fix_MPMintens(fn_in,thrMPM,prefix,crt_mask,fix_zeros)
 % were "fixed", with a value of
 % - 1 if the voxel value was <0,
 % - 2 if >thrMPM
-% - 3 if equal to zero
+% - 3 if was equal to zero but got fixed
+% - 4 if was and still is equal to zero
 
 % Some flags
 sz_thr = 25e3; % arbitrary maximum size of patch to fix -> no big holes
