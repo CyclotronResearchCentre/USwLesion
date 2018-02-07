@@ -3,7 +3,7 @@ function fn_out = crc_build_ICVmsk(fn_in,opt)
 % these should be GM, WM & CSF at least.
 % This works by 
 % - adding the tissue class images together -> all voxels get a p-ICV
-% - smoothing (8mm FHWM) -> enlarges things a bit
+% - smoothing (4 mm FHWM) -> enlarges things a bit
 % - thresholding at .3 to keep those really in the ICV
 % - fixing the obtained mask in different ways (see crc_fix_msk.m)
 % 
@@ -84,7 +84,7 @@ crc_fix_msk(fn_ICV,opt_fx_mask); % overwriting the file fn_ICV
 %% Warping and smoothing, if requested
 if ~isempty(opt.fn_warp)
     % Apply warping
-    matlabbatch = create_MB(fn_ICV,spm_file(opt.fn_warp,'number',''));
+    matlabbatch = crt_batch_normalize_write(fn_ICV,spm_file(opt.fn_warp,'number',''));
     spm_jobman('run', matlabbatch);
     fn_wICV = spm_file(fn_ICV,'prefix','w');
     fn_out = char(fn_out,fn_wICV);
@@ -108,7 +108,7 @@ end
 %% SUBFUNCTIONS
 % =======================================================================
 
-function matlabbatch = create_MB(fn_ICV,fn_warp)
+function matlabbatch = crt_batch_normalize_write(fn_ICV,fn_warp)
 % Building matlabbatch for the normalize-write operation, muche easier than
 % building the deformation and applying it manually.
 matlabbatch{1}.spm.spatial.normalise.write.subj.def(1) = {fn_warp};
