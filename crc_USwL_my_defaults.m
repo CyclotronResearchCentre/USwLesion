@@ -29,9 +29,9 @@ uswl_def.segment.imgTpm     = {fullfile(Tbx_pth,'eTPM','eTPM_wBG.nii')};
 uswl_def.segment.thrMPM     = 1;
 uswl_def.segment.ICVmsk     = 1;
 
-uswl_def.segment.biasreg    = 1e-03; % almost nothing, assuming we use MPMs
-uswl_def.segment.biasfwhm   = 60; % no bias correction
-uswl_def.segment.biaswr     = [1 1]; % Not saving bias corrected/field images
+uswl_def.segment.biasreg    = 1e-03; % almost nothing
+uswl_def.segment.biasfwhm   = 60; % some bias correction
+uswl_def.segment.biaswr     = [1 1]; % Saving bias corrected/field images
 
 % Parameters for the segmentation of masked anatomical reference (to build
 % the updated TPM)
