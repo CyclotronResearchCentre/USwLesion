@@ -12,13 +12,13 @@ function fn_out = crc_fix_MPMintens(fn_in,opt)
 % - fn_in   : filename of MPM images to fix
 % - opt     : option structure
 %       strMPM   : filename parts used to pick the image type.
-%                  Def. {'_A'    '_MT'    '_R1'    '_R2'}
+%                  [def. {'_A'    '_MT'    '_R1'    '_R2'}]
 %       thrMPM   : Max cap for the corresponding image type
-%                  Def. [200 5 2000 2]
-%       prefix   : prefix added to filename. Def. 'fx_'
+%                  [def. [200 5 2000 2]]
+%       prefix   : prefix added to filename. [def. 'fx_']
 %       crt_mask : create a map indicating the voxels that were fixed  
-%                  Def. true
-%       fix_zeros: fix the zero-holes in the image. Def. true.
+%                  [def. true]
+%       fix_zeros: fix the zero-holes in the image. [def. true]
 %
 % OUTPUT
 % - fn_out  : filename of fixed MPM images
