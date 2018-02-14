@@ -336,7 +336,7 @@ if ~isempty(fn_in{4})
 end
 
 clear matlabbatch
-[matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp);
+[matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp);
 spm_jobman('run', matlabbatch);
 
 fn_warped_struct = spm_file(fn_in{2},'prefix','w');
@@ -884,8 +884,8 @@ end
 
 %% STEP 6: 
 % Creating the normalization batch for the MPM
-function [matlabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp)
-% [malabbatch] = batch_normalize_MPM(fn_img2warp,fn_warp)
+function [matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp)
+% [malabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp)
 %
 % INPUT
 % - fn_2warp : cell array of filenames of images to warp
