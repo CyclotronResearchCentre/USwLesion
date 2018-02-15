@@ -34,25 +34,29 @@ imgRef         = cfg_files;
 imgRef.tag     = 'imgRef';
 imgRef.name    = 'Structural reference image';
 imgRef.help    = {'Select 1 reference structural image.', ...
-    ['This image is used 1st to map the lesion mask into MNI and generate ' ...
-    'the subjec specific TPM. This would typically be a T1 or MT weighted image. ' ...
-    'The masked image k_img and the brain mask icv_k_ing are saved on the drive']};
+    ['This image is only used to map the lesion mask into MNI using a ' ...
+    ' "cost function masking approach. This step is necessary to generate ' ...
+    'the subjec specific TPM.' , ...
+    'This would typically be a T1 or MT weighted image. ' ...
+    ]};
 imgRef.filter = 'image';
 imgRef.ufilter = '.*';
 imgRef.num     = [1 1];
 
 % ---------------------------------------------------------------------
-% imgMPM Structural quantitative images
+% imgStruc Structural quantitative images
 % ---------------------------------------------------------------------
-imgMPM         = cfg_files;
-imgMPM.tag     = 'imgMPM';
-imgMPM.name    = 'Structural quantitative images';
-imgMPM.help    = {'Select the structural quantitative (MPM-VBQ) images .', ...
-    'These will be segmented, including the lesioned area, and warped into MNI space.'};
-imgMPM.filter = 'image';
-imgMPM.ufilter = '.*';
-imgMPM.num     = [0 Inf];
-imgMPM.val       = {''};
+imgStruc         = cfg_files;
+imgStruc.tag     = 'imgStruc';
+imgStruc.name    = 'Structural images';
+imgStruc.help    = {'Select the structural images .', ...
+    'These will be "multi-channel Unified-Segmented" and warped into MNI space.' ...
+    'This ''mcUS'' includes a tissue class for the lesioned tissues.' ...
+    'If no image are provided, then the ''reference strucutral'' will be used.'};
+imgStruc.filter = 'image';
+imgStruc.ufilter = '.*';
+imgStruc.num     = [0 Inf];
+imgStruc.val       = {''};
 
 % ---------------------------------------------------------------------
 % imgOth Other structural images
@@ -356,7 +360,7 @@ options.help    = {'Some processing options.'};
 USwL         = cfg_exbranch;
 USwL.tag     = 'uswl';
 USwL.name    = 'US with lesion';
-USwL.val     = {imgMsk imgRef imgMPM imgOth options};
+USwL.val     = {imgMsk imgRef imgStruc imgOth options};
 USwL.help    = {['Unified segmentation for images with lesions when an ',...
     'approximate mask is also provided. This mask is turned into a ',...
     '"tissue probability map" and added to SPM''s usual TPMs to form ',...

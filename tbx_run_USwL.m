@@ -19,8 +19,8 @@ job = varargin{1}; % To follow SPM tradition...
 
 %% Collect input -> to fit into previously written code. :-)
 fn_in{1} = spm_file(job.imgMsk{1},'number',''); % Mask image
-fn_in{2} = spm_file(job.imgRef{1},'number',''); % structural reference
-fn_in{3} = char(spm_file(job.imgMPM,'number','')); % All MPM's
+fn_in{2} = spm_file(job.imgRef{1},'number',''); % Structural reference
+fn_in{3} = char(spm_file(job.imgStruc,'number','')); % All Structurals
 fn_in{4} = char(spm_file(job.imgOth,'number','')); % Other images
 
 options = job.options;
