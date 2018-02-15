@@ -2,6 +2,9 @@ function fn_out = crc_USwL(fn_in,options)
 % 
 % Function doing all the work of "Unified segmentation with lesion".
 % 
+% FORMAT
+%  fn_out = crc_USwL(fn_in,options)
+% 
 % INPUT
 % - fn_in   : cell array (1x4) of input filenames
 %       {1} : lesion mask image, where 1 is lesion, 0 is healthy. Must be
@@ -10,7 +13,7 @@ function fn_out = crc_USwL(fn_in,options)
 %             function masking" (CFM) approach. Must be provided.
 %       {3} : structural image(s), used for the multi-channel "US with 
 %             Lesion". If none, then the ref-struct is used.
-%       {4} : other structural images to be warped along
+%       {4} : other structural images to be warped/masked along
 % - options :
 %       imgTpm  : tissue probability maps (just one 4D file)
 %       biasreg : bias regularisation value
@@ -25,17 +28,18 @@ function fn_out = crc_USwL(fn_in,options)
 % 
 % OUTPUT
 % - fn_out :
-%       wstruct     : warped structural reference, 1st US with CFM
-%       ICVmsk      : intra-cranial volume mask, as generated from str-ref
-%       kStruc_i    : masked i^th structural images
+%       ICVmsk      : intra-cranial volume mask, as generated from USwL
+%       wICVmsk     : intra-cranial volume mask, as generated from USwL
+%       kStruc_i    : fixed (masked a/o modulated) i^th structural images, if created 
 %       kOth_i      : masked i^th other image
-%       wStruc_i    : warped (masked) i^th structural image
+%       wStruc_i    : warped (masked/modulated) i^th structural image
 %       wOth_i      : warped (masked) i^th other image
 %       TPMl        : subject specific TPM with lesion
 %       segmImg     : structure with posterior tissue probabilities
-%           c(i)    : class #i in subject space
-%           wc(i)   : class #i in MNI space
-%           mwc(i)  : modulated class #i in MNI space
+%           c(i)    : class #i in subject space (1-4)
+%           wc(i)   : class #i in MNI space (1-4)
+%           mwc(i)  : modulated class #i in MNI space (1-4)
+%           rc(i)   : DARTEL  ready class #i in subject space (1-3)
 % 
 % OPERATIONS
 % Here are the main steps:
@@ -273,6 +277,7 @@ opt_ICV = struct( ...
     'fn_ref', spm_file(fn_in{3}(1,:)), ...
     'fn_warp', spm_file(fn_in{3}(1,:),'prefix','y_'), ...
     'smoK', 0);
+%     'fn_iwarp', spm_file(fn_in{3}(1,:),'prefix','iy_'), ...
 fn_icv_out = crc_build_ICVmsk(fn_TCin,opt_ICV);
 fn_ICV = deblank(fn_icv_out(1,:));
 fn_wICV = deblank(fn_icv_out(2,:));
@@ -301,9 +306,13 @@ for ii=1:nStruc
 end
 if all(exist_mStruc)
     fn_in{3} = fn_mStruc;
+    fn_ICV_in3 = fn_mStruc;
+    exist_mStruc = true;
+else
+    exist_mStruc = false;
 end
 
-% Apply the final ICV mask on struct & Others
+% Apply the final ICV mask on Struct & Others
 if options.ICVmsk % ICV-mask the Struct & others
     fn_tmp = [];
     for ii=1:nStruc
@@ -325,56 +334,58 @@ if options.ICVmsk % ICV-mask the Struct & others
 end
 
 %% 6. Apply the deformation onto the Stru/Other -> warped Struc/Other
-% Re-create an ICV mask
+% Apply the w-ICV mask
 
 fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
 % Apply on all images: structs + others, if available
 
-fn_img2warp = {fn_in{3}}; % Use Struc images, Ref image not necessary 
+% fn_img2warp = {fn_in{3}}; % Use Struc images, Ref image not necessary 
+fn_img2warp = fn_in(3); % Use Struc images, Ref image not necessary 
 if ~isempty(fn_in{4})
     fn_img2warp = {char(fn_img2warp{1} , fn_in{4})};
 end
 
 clear matlabbatch
-[matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp);
+opt = struct( ...
+        'bb', [-78 -112 -70 ;78 76 85], ...
+        'vox', [1 1 1], ...
+        'interp', 4 );
+[matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp,opt);
 spm_jobman('run', matlabbatch);
 
-fn_warped_struct = spm_file(fn_in{2},'prefix','w');
-if ~isempty(fn_in{3})
-    fn_warped_Struc = spm_file(fn_in{3},'prefix','w');
-else
-    fn_warped_Struc = '';
-end
+% Pick up warped volumes, Struc and Oth (if available)ss
+fn_warped_Struc = spm_file(fn_in{3},'prefix','w');
 if ~isempty(fn_in{4})
     fn_warped_Oth = spm_file(fn_in{4},'prefix','w');
 else
     fn_warped_Oth = '';
 end
-% fn_mwTC = char( ...
-%     spm_file(fn_in{3}(1,:),'prefix','smwc1'), ...
-%     spm_file(fn_in{3}(1,:),'prefix','smwc2'), ...
-%     spm_file(fn_in{3}(1,:),'prefix','smwc3') ); %#ok<*NASGU>
 
 %% 7. Collect all the image filenames created
+% - fn_out :
+%       ICVmsk      : intra-cranial volume mask, as generated from USwL
+%       wICVmsk     : intra-cranial volume mask, as generated from USwL
+%       kStruc_i    : fixed (masked a/o modulated) i^th structural images, if created 
+%       kOth_i      : masked i^th other image
+%       wStruc_i    : warped (masked/modulated) i^th structural image
+%       wOth_i      : warped (masked) i^th other image
+%       TPMl        : subject specific TPM with lesion
+%       segmImg     : structure with posterior tissue probabilities
+%           c(i)    : class #i in subject space (1-4)
+%           wc(i)   : class #i in MNI space (1-4)
+%           mwc(i)  : modulated class #i in MNI space (1-4)
+%           rc(i)   : DARTEL  ready class #i in subject space (1-3)
 
-% There must always be a struct-ref -> warped one
-fn_out.wstruct = {deblank(fn_warped_struct)};
+% ICV's
+fn_out.ICVmsk = {fn_ICV};
+fn_out.wICVmsk = {fn_wICV};
 
-if options.thrMPM && nStruc ~= 0
+if options.ICVmsk || exist_mStruc;
     for ii=1:nStruc
-        fn_out.(sprintf('fxMPM_%d',ii)) = ...
-            {spm_file(deblank(fn_in_3_orig(ii,:)),'prefix','t')};
-        fn_out.(sprintf('fxMPMmsk_%d',ii)) = ...
-            {spm_file(fn_in_3_orig(ii,:),'prefix','fx_')};
+        fn_out.(sprintf('kStruc_%d',ii)) = {deblank(fn_ICV_in3(ii,:))};
     end
 end
-
-fn_out.ICVmsk = {fn_ICV};
-
-if options.ICVmsk && nStruc ~= 0;
-    for ii=1:nStruc
-        fn_out.(sprintf('kMPM_%d',ii)) = {deblank(fn_in{3}(ii,:))};
-    end
+if options.ICVmsk && nOth
     for ii=1:nOth
         fn_out.(sprintf('kOth_%d',ii)) = {deblank(fn_in{4}(ii,:))};
     end
@@ -410,11 +421,11 @@ fn_out.segmImg.mwc1 = {deblank(fn_mwCimg(1,:))}; % modulated warped GM
 fn_out.segmImg.mwc2 = {deblank(fn_mwCimg(2,:))}; % modulated warped WM
 fn_out.segmImg.mwc3 = {deblank(fn_mwCimg(3,:))}; % modulated warped Lesion
 fn_out.segmImg.mwc4 = {deblank(fn_mwCimg(4,:))}; % modulated warped CSF
+% Dartel ready segmented tissues
+fn_out.segmImg.rc1 = {deblank(fn_rCimg(1,:))}; % modulated warped GM
+fn_out.segmImg.rc2 = {deblank(fn_rCimg(2,:))}; % modulated warped WM
+fn_out.segmImg.rc3 = {deblank(fn_rCimg(3,:))}; % modulated warped Lesion
 
-% if options.thrLesion ~= 0
-%     crc_lesion_cleanup(fn_out.segmImg.c3,options.thrLesion);
-% end
-% fn_out = {};
 end
 
 % =======================================================================
@@ -884,19 +895,29 @@ end
 
 %% STEP 6: 
 % Creating the normalization batch for the MPM
-function [matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp)
-% [malabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp)
+function [matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp,opt)
+% [malabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp, opt)
 %
 % INPUT
 % - fn_2warp : cell array of filenames of images to warp
 % - fn_wapr  : file name of warping image
+% - opt      : option structure
+%   .bb      : bounding box [def. [-78 -112 -70 ;78 76 85]]
+%   .vox     : voxel size [def. [1 1 1]mm3] 
+%   .interp  : interpolation scheme [def. 4]
+
+if nargin<3
+    opt = struct( ...
+        'bb', [-78 -112 -70 ;78 76 85], ...
+        'vox', [1 1 1], ...
+        'interp', 4 );
+end
 
 matlabbatch{1}.spm.spatial.normalise.write.subj.def = {fn_warp};
 matlabbatch{1}.spm.spatial.normalise.write.subj.resample = cellstr(char(fn_img2warp));
-matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70
-    78 76 85];
-matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = [1 1 1];
-matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 4;
+matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = opt.bb;
+matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = opt.vox;
+matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = opt.interp;
 
 end
 
