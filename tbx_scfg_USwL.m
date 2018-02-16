@@ -44,15 +44,17 @@ imgRef.ufilter = '.*';
 imgRef.num     = [1 1];
 
 % ---------------------------------------------------------------------
-% imgStruc Structural quantitative images
+% imgStruc Structural images for multi-channel USwL
 % ---------------------------------------------------------------------
 imgStruc         = cfg_files;
 imgStruc.tag     = 'imgStruc';
-imgStruc.name    = 'Structural images';
+imgStruc.name    = 'Structural images for US-with-Lesion';
 imgStruc.help    = {'Select the structural images .', ...
-    'These will be "multi-channel Unified-Segmented" and warped into MNI space.' ...
-    'This ''mcUS'' includes a tissue class for the lesioned tissues.' ...
-    'If no image are provided, then the ''reference strucutral'' will be used.'};
+    ['These will be "multi-channel Unified-Segmented-with-Lesion" and '...
+    'warped into MNI space. '] ...
+    ['This ''mcUS'' includes a tissue class for the lesioned tissues. ' ...
+    'If no image are selected, then the Reference image will be used ' ...
+    'for the US-with-Lesion step.']};
 imgStruc.filter = 'image';
 imgStruc.ufilter = '.*';
 imgStruc.num     = [0 Inf];
@@ -63,8 +65,9 @@ imgStruc.val       = {''};
 % ---------------------------------------------------------------------
 imgOth         = cfg_files;
 imgOth.tag     = 'imgOth';
-imgOth.name    = 'Other structural images';
-imgOth.help    = {'Select the other structural images.', ...
+imgOth.name    = 'Other images';
+imgOth.help    = {['Select the other images to be warped along but not ', ...
+    'entering the US-with-Lesion.'], ...
     ['For example the FLAIR image that was used to create the "lesion mask". ' ...
     'These will be segmented and warped into MNI space.']};
 imgOth.filter = 'image';
@@ -83,27 +86,11 @@ imgTpm.tag     = 'imgTpm';
 imgTpm.name    = 'Tissue probability maps';
 imgTpm.help    = {'Select the TPM images. ', ...
     ['A TPM_les file will be created from this file with lesions as', ...
-     ' a new tissue class in 3rd position!']};
+    ' a new tissue class in 3rd position!']};
 imgTpm.filter  = 'image';
 imgTpm.ufilter = '.*';
 imgTpm.num     = [1 1];
 imgTpm.def     = @(val)crc_USwL_get_defaults('segment.imgTpm', val{:});
-
-% ---------------------------------------------------------------------
-% img4US Images to use for the segmentation
-% ---------------------------------------------------------------------
-img4US         = cfg_menu;
-img4US.tag     = 'img4US';
-img4US.name    = 'Images to use for the segmentation';
-img4US.help    = {'Choose which image(s) are used for the segmentation '...
-    'and estimation of the warping into MNI space.'};
-img4US.labels = {
-    'Structural reference only'
-    'all MPMs [DEF]'
-    'all MPMs + others'
-    }';
-img4US.values = {0 1 2};
-img4US.def     = @(val)crc_USwL_get_defaults('segment.img4US', val{:});
 
 % ---------------------------------------------------------------------
 % tpm4lesion Tissue probability map(s) affected by the lesion
@@ -229,18 +216,48 @@ biaswr.tag     = 'biaswr';
 biaswr.name    = 'Save bias corrected';
 biaswr.help    = {'This is the option to save a bias corrected version of your images from this channel, or/and the estimated bias field. MR images are usually corrupted by a smooth, spatially varying artifact that modulates the intensity of the image (bias). These artifacts, although not usually a problem for visual inspection, can impede automated processing of the images.  The bias corrected version should have more uniform intensities within the different types of tissues.'};
 biaswr.labels = {
-                'Save Nothing'
-                'Save Bias Corrected'
-                'Save Bias Field'
-                'Save Field and Corrected'
-                }';
+    'Save Nothing'
+    'Save Bias Corrected'
+    'Save Bias Field'
+    'Save Field and Corrected'
+    }';
 biaswr.values = {
-                [0 0]
-                [0 1]
-                [1 0]
-                [1 1]
-                }';
+    [0 0]
+    [0 1]
+    [1 0]
+    [1 1]
+    }';
 biaswr.def     = @(val)crc_USwL_get_defaults('segment.biaswr', val{:});
+
+% ---------------------------------------------------------------------
+% bias_yes Apply bias correction
+% ---------------------------------------------------------------------
+bias_yes         = cfg_branch;
+bias_yes.tag     = 'bias_yes';
+bias_yes.name    = 'Apply bias correction';
+bias_yes.val     = {biasreg biasfwhm biaswr};
+bias_yes.help    = {'Bias correction options.'};
+
+% ---------------------------------------------------------------------
+% bias_no No bias correction
+% ---------------------------------------------------------------------
+bias_no         = cfg_const;
+bias_no.tag     = 'bias_no';
+bias_no.name    = 'No bias correction';
+bias_no.val     = {0};
+bias_no.help    = {'No bias correction.'};
+
+% ---------------------------------------------------------------------
+% Number of Gaussians per tissue class used to model the lesion
+% ---------------------------------------------------------------------
+bias        = cfg_choice;
+bias.tag    = 'bias';
+bias.name   = 'Apply intensity bias correction to structural images in USwL';
+bias.values = {bias_no, bias_yes};
+bias.val    = {bias_no};
+bias.help   = {...
+    ['You may wish to correct intensity bias in the structural images ',...
+    'during the (multi-channel) US-with-Lesion process.']};
 
 % ---------------------------------------------------------------------
 % Number of Gaussians per tissue class used to model the lesion
@@ -258,58 +275,27 @@ NbGaussian.num     = [1 Inf];
 NbGaussian.def     = @(val)crc_USwL_get_defaults('segment.NbGaussian', val{:});
 
 % ---------------------------------------------------------------------
-% thrMPM Threshold outlier values from the MPM
-% ---------------------------------------------------------------------
-thrMPM         = cfg_menu;
-thrMPM.tag     = 'thrMPM';
-thrMPM.name    = 'Preliminary thresholding the MPMs';
-thrMPM.help    = {['Apply a threshold on the MPM''s to remove outlier ',...
-    'values from the images before the segmentation itself.'],...
-    ['Take the absolute value of voxels < 0. Voxels > thr are set to thr ',...
-    '+ small random number. The ''thr'' value is defined for each ',...
-    'MPM (A/MT/R1/R2) seperately.'],...
-    'The modified MPM images are prefixed with ''t''.',...
-    'A mask image is created to keep track of those "fixed" voxels".'};
-thrMPM.labels = {
-    'No'
-    'Yes'
-    }';
-thrMPM.values = {0 1};
-thrMPM.def     = @(val)crc_USwL_get_defaults('segment.thrMPM', val{:});
-
-% ---------------------------------------------------------------------
-% ICVmsk Create ICV-mask and mask the MPMs
+% ICVmsk Create ICV-mask and mask the Struct + Other
 % ---------------------------------------------------------------------
 ICVmsk         = cfg_menu;
 ICVmsk.tag     = 'ICVmsk';
-ICVmsk.name    = 'Mask the MPMs & Other images by created ICV-mask';
+ICVmsk.name    = 'Mask the Struct & Other images by created ICV-mask';
 ICVmsk.help    = {['An ICV mask is created from the reference structural ', ...
-    'image and can be applied onto the MPMs/other images before the segmentation itself. ',...
+    'image and can be applied onto the Struct images before the segmentation itself. ',...
     'This cleans up the images quite a bit and ', ...
     'is equivalent to "skull stripping". This helps, in some cases, the ', ...
     'multi-channel segmentation of the MPMs.']
+    ['After the main USwL step, a final ICV mask is also created and ',...
+    'applied on all the images and tissue maps.']
     ['Note that the TPMs are also masked so that the images to segment ',...
     'and TPMs match together.']
-    'The masked MPM/other images are prefixed with ''k''.'};
+    'The masked Struc/Other images are prefixed with ''k''.'};
 ICVmsk.labels = {
     'No'
     'Yes'
     }';
 ICVmsk.values = {0 1};
 ICVmsk.def     = @(val)crc_USwL_get_defaults('segment.ICVmsk', val{:});
-
-% ---------------------------------------------------------------------
-% thrLesion Threshold lesion mask based on spatial extent
-% ---------------------------------------------------------------------
-thrLesion         = cfg_entry;
-thrLesion.tag     = 'thrLesion';
-thrLesion.name    = 'Lesion mask extent thresholding';
-thrLesion.help    = {'Apply a spatial threshold on the lesion tissue class c3: ',...
-    '- 0 means no threshold;' ,... 
-    '- k indicates that only clusters of size larger or equal to k are kept;', ...
-    '- ''Inf'' keeps only the largest cluster.'};
-thrLesion.num    = [1 1];
-thrLesion.def     = @(val)crc_USwL_get_defaults('segment.thrLesion', val{:});
 
 %--------------------------------------------------------------------------
 % mrf MRF Parameter
@@ -322,34 +308,13 @@ mrf.strtype = 'r';
 mrf.num     = [1 1];
 mrf.def     = @(val)crc_USwL_get_defaults('segment.mrf', val{:});
 
-% %--------------------------------------------------------------------------
-% % cleanup Clean up any partitions
-% %--------------------------------------------------------------------------
-% cleanup         = cfg_menu;
-% cleanup.tag     = 'cleanup';
-% cleanup.name    = 'Clean Up';
-% cleanup.help    = {
-%     'This uses a crude routine for extracting the brain from segmented images.  It begins by taking the white matter, and eroding it a couple of times to get rid of any odd voxels.  The algorithm continues on to do conditional dilations for several iterations, where the condition is based upon gray or white matter being present.This identified region is then used to clean up the grey and white matter partitions.  Note that the fluid class will also be cleaned, such that aqueous and vitreous humour in the eyeballs, as well as other assorted fluid regions (except CSF) will be removed.'
-%     ''
-%     'If you find pieces of brain being chopped out in your data, then you may wish to disable or tone down the cleanup procedure. Note that the procedure uses a number of assumptions about what each tissue class refers to.  If a different set of tissue priors are used, then this routine should be disabled.'
-%     }';
-% cleanup.labels = {
-%     'Dont do cleanup'
-%     'Light Clean'
-%     'Thorough Clean'
-%     }';
-% cleanup.values = {0 1 2};
-% cleanup.def     = @(val)crc_USwL_get_defaults('segment.cleanup', val{:});
-
 % ---------------------------------------------------------------------
 % options Options
 % ---------------------------------------------------------------------
 options         = cfg_branch;
 options.tag     = 'options';
 options.name    = 'Options';
-% options.val     = {imgTpm img4US biasreg biasfwhm biaswr NbGaussian tpm4lesion thrMPM ICVmsk mrf cleanup thrLesion};
-options.val     = {imgTpm img4US biasreg biasfwhm biaswr NbGaussian ...
-                    tpm4lesion thrMPM ICVmsk mrf thrLesion};
+options.val     = {imgTpm NbGaussian tpm4lesion bias ICVmsk mrf };
 options.help    = {'Some processing options.'};
 %_______________________________________________________________________
 
@@ -396,28 +361,28 @@ cdep(end).sname      = 'Subject''s ICV mask, native space';
 cdep(end).src_output = substruct('.','ICVmsk');
 cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 
-% Thresholded MPM + Mask
-if job.options.thrMPM
-    for ii=1:numel(job.imgMPM)
-        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-        cdep(end).sname      = sprintf('Fixed MPM image #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('fxMPM_%d',ii));
-        cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
-    end
-    for ii=1:numel(job.imgMPM)
-        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-        cdep(end).sname      = sprintf('Fix-mask MPM #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('fxMPMmsk_%d',ii));
-        cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
-    end
-end
+% % Thresholded MPM + Mask
+% if job.options.thrMPM
+%     for ii=1:numel(job.imgStruc)
+%         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+%         cdep(end).sname      = sprintf('Fixed MPM image #%d',ii);
+%         cdep(end).src_output = substruct('.',sprintf('fxMPM_%d',ii));
+%         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+%     end
+%     for ii=1:numel(job.imgStruc)
+%         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+%         cdep(end).sname      = sprintf('Fix-mask MPM #%d',ii);
+%         cdep(end).src_output = substruct('.',sprintf('fxMPMmsk_%d',ii));
+%         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+%     end
+% end
 
 % ICV-masked MPM
 if job.options.ICVmsk
-    for ii=1:numel(job.imgMPM)
+    for ii=1:min(numel(job.imgStruc),1)
         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-        cdep(end).sname      = sprintf('ICV-masked MPM #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('kMPM_%d',ii));
+        cdep(end).sname      = sprintf('ICV-masked Struct #%d',ii);
+        cdep(end).src_output = substruct('.',sprintf('kStruct_%d',ii));
         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
     end
     for ii=1:numel(job.imgOth)
@@ -429,14 +394,13 @@ if job.options.ICVmsk
 end
 
 % Warped MPM
-if ~isempty(job.imgMPM)
-    for ii=1:numel(job.imgMPM)
-        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-        cdep(end).sname      = sprintf('Warped MPM image #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('wMPM_%d',ii));
-        cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
-    end
+for ii=1:min(numel(job.imgStruc),1)
+    cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+    cdep(end).sname      = sprintf('Warped Struct image #%d',ii);
+    cdep(end).src_output = substruct('.',sprintf('wStruct_%d',ii));
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
+
 % Warped Other
 if ~isempty(job.imgOth)
     for ii=1:numel(job.imgOth)

@@ -17,6 +17,20 @@ function fn_out = tbx_run_USwL(varargin)
 
 job = varargin{1}; % To follow SPM tradition...
 
+% Deal with intensity bias correction option
+if isfield(job.options.bias,'bias_no')
+    % bias correction
+    job.options.biasreg = 10;
+    job.options.biasfwhm = Inf;
+    job.options.biaswr = [0 0];
+else
+    % with bias correction
+    job.options.biasreg = job.options.bias.bias_yes.biasreg;
+    job.options.biasfwhm = job.options.bias.bias_yes.biasfwhm;
+    job.options.biaswr = job.options.bias.bias_yes.biaswr;
+end
+job.options = rmfield(job.options,'bias');
+
 %% Collect input -> to fit into previously written code. :-)
 fn_in{1} = spm_file(job.imgMsk{1},'number',''); % Mask image
 fn_in{2} = spm_file(job.imgRef{1},'number',''); % Structural reference
@@ -25,6 +39,7 @@ fn_in{4} = char(spm_file(job.imgOth,'number','')); % Other images
 
 options = job.options;
 
+% For back compatibility issue
 if ~isfield(options,'cleanup') || ...
         isempty(options.cleanup) || strcmp(options.cleanup,'<UNDEFINED>')
     options.cleanup = 0;
