@@ -1,36 +1,36 @@
 function fn_out = crc_USwL(fn_in,options)
-% 
+%
 % Function doing all the work of "Unified segmentation with lesion".
-% 
+%
 % FORMAT
 %  fn_out = crc_USwL(fn_in,options)
-% 
+%
 % INPUT
 % - fn_in   : cell array (1x4) of input filenames
 %       {1} : lesion mask image, where 1 is lesion, 0 is healthy. Must be
 %             provided.
 %       {2} : reference structural image, used for the 1st US with a "cost
 %             function masking" (CFM) approach. Must be provided.
-%       {3} : structural image(s), used for the multi-channel "US with 
+%       {3} : structural image(s), used for the multi-channel "US with
 %             Lesion". If none, then the ref-struct is used.
 %       {4} : other structural images to be warped/masked along
 % - options :
 %       imgTpm  : tissue probability maps (just one 4D file)
 %       biasreg : bias regularisation value
-%       biasfwhm: bias FWHM value (Inf = no bias correction) 
+%       biasfwhm: bias FWHM value (Inf = no bias correction)
 %       biaswr  : flag -> save bias corrected and/or bias field ([0/1 0/1])
 %       NbGaussian : number of Gaussians per tissue class, incl. lesion.
 %       tpm4lesion : flag -> TPM(s) affected by the lesion
-%                      (0, GM; 1, WM; 2, GM+WM; 3, GM+WM+CSF) 
+%                      (0, GM; 1, WM; 2, GM+WM; 3, GM+WM+CSF)
 %       ICVmsk  : mask the images images by created ICV-mask, [0/1], in
 %                 native and warped space
 %       mrf     : MRF parameter
-% 
+%
 % OUTPUT
 % - fn_out :
 %       ICVmsk      : intra-cranial volume mask, as generated from USwL
 %       wICVmsk     : intra-cranial volume mask, as generated from USwL
-%       kStruc_i    : fixed (masked a/o modulated) i^th structural images, if created 
+%       kStruc_i    : fixed (masked a/o modulated) i^th structural images, if created
 %       kOth_i      : masked i^th other image
 %       wStruc_i    : warped (masked/modulated) i^th structural image
 %       wOth_i      : warped (masked) i^th other image
@@ -40,25 +40,25 @@ function fn_out = crc_USwL(fn_in,options)
 %           wc(i)   : class #i in MNI space (1-4)
 %           mwc(i)  : modulated class #i in MNI space (1-4)
 %           rc(i)   : DARTEL  ready class #i in subject space (1-3)
-% 
+%
 % OPERATIONS
 % Here are the main steps:
 %   1. "Trim 'n grow" the mask image {1} : -> t_Msk / dt_Msk
-%       - remov the "small" MS patches using a simple criteria: volume of 
+%       - remov the "small" MS patches using a simple criteria: volume of
 %         patch must be >= minVol (mm3) -> t_Msk image
 %       - then grow volume by nDilate voxel(s) -> dt_Msk image
 %      minVol & nDilate are set in the crc_USwL_defaults file!
 %   2. Apply the mask on the reference structural images {2} -> k_sRef
 %   3. Segment the masked structural (k_sRef), normalize the cleaned up
-%      mask (t_Msk) and smooth it 
+%      mask (t_Msk) and smooth it
 %      -> new tissue probability map for the lesion
 %   4. Update the TPMs to include a 7th tissue class -> TPMms
 %   Note that the lesion is inserted in *3rd position*, between WM and CSF!
 %   5. Do the segmentation with the new TPM_ms on the structural images {3}
-%   6. Apply the deformation onto the structural & other images {3,4} 
+%   6. Apply the deformation onto the structural & other images {3,4}
 %       -> create warped images
 %   7. Collect all the image filenames created
-% 
+%
 % NOTES
 % - Check the Readme file for further processing details.
 % - some parameters/constants are set in the crc_USwL_defaults file and NOT
@@ -74,19 +74,6 @@ function fn_out = crc_USwL(fn_in,options)
 % Cyclotron Research Centre, University of Liege, Belgium
 % Cyril Pernet updated few bits to work with no MPM images + added structural
 % normalization and N Gaussians - Edinburgh Imaging, The University of Edinburgh
-
-% 
-% % TESTING parfor
-% nG = options.NbGaussian;
-% opt = crc_USwL_get_defaults('uTPM');
-% scDefReg = crc_USwL_get_defaults('msksegm.scDefReg');
-% 
-% fprintf('\nSubject %s: nDil = %d, nG_c3 = %d, ScalReg = %1.1g\n', ...
-%     spm_file(fn_in{1},'basename'),opt.nDilate, nG(3), scDefReg);
-% fn_out = {};
-% 
-% return
-% 
 
 %% Input data
 % fn_in{1} = Mask image
@@ -111,16 +98,15 @@ pth = spm_file(fn_in{2},'path');
 % Deal with options
 if nargin<2, options = struct; end
 options_def = struct( ...
-	'imgTpm', {crc_USwL_get_defaults('segment.imgTpm')}, ...
+    'imgTpm', {crc_USwL_get_defaults('segment.imgTpm')}, ...
     'biasreg', crc_USwL_get_defaults('segment.biasreg'), ...
     'biasfwhm', crc_USwL_get_defaults('segment.biasfwhm'), ...
     'biaswr',crc_USwL_get_defaults('segment.biaswr'), ...
-    'NbGaussian', crc_USwL_get_defaults('segment.NbGaussian'), ... 
-    'tpm4lesion', crc_USwL_get_defaults('segment.tpm4lesion'), ... 
+    'NbGaussian', crc_USwL_get_defaults('segment.NbGaussian'), ...
+    'tpm4lesion', crc_USwL_get_defaults('segment.tpm4lesion'), ...
     'ICVmsk', crc_USwL_get_defaults('segment.ICVmsk'), ...
     'mrf', crc_USwL_get_defaults('segment.mrf') );
 options = crc_check_flag(options_def,options); % Check and pad filter structure
-
 
 % By default no cleanup after US-with-lesion segmentation!
 if ~isfield(options,'cleanup') || ...
@@ -165,7 +151,7 @@ fn_tpm_msksegm = crc_USwL_get_defaults('msksegm.imgTpm');
 scDefReg = crc_USwL_get_defaults('msksegm.scDefReg');
 
 % Create a matlabbbatch with normalize and smooth operations, pass some key
-% input then rely on default values in crc_USwL_defaults.m ('msksegm' bit) 
+% input then rely on default values in crc_USwL_defaults.m ('msksegm' bit)
 matlabbatch = crt_batch_normalize_smooth( ...
     fn_kRef, ... % masked structural image used for the warping estimation
     fn_tMsk, ... % cleaned up lesion mask to be warped into MNI
@@ -195,7 +181,7 @@ fn_swICV = deblank(fn_icv_out(3,:)); % -> in MNI space, smoothed
 % c1/2/3 images + (inverse) warps and *_seg8.mat files
 to_delete = char( fn_TCin(1:3,:), opt_ICV.fn_warp, opt_ICV.fn_iwarp, ...
     spm_file(fn_kRef,'suffix','_seg8','ext','mat') );
- % for ii=1:size(to_delete,1), delete(deblank(to_delete(ii,:))); end
+for ii=1:size(to_delete,1), delete(deblank(to_delete(ii,:))); end
 
 % Apply the mask (using a sub-function)
 % -> this possibly overwrites the masked struct reference
@@ -252,7 +238,7 @@ clear matlabbatch
 spm_jobman('run', matlabbatch);
 
 fn_Cimg   = spm_select('FPList',pth, ...  % native space
-    ['^c[0-9].*',spm_file(fn_Img2segm(1,:),'basename'),'\.nii$']); 
+    ['^c[0-9].*',spm_file(fn_Img2segm(1,:),'basename'),'\.nii$']);
 fn_rCimg  = spm_select('FPList',pth, ...  % native dartel imported
     ['^rc[0-9].*',spm_file(fn_Img2segm(1,:),'basename'),'\.nii$']);
 fn_wCimg  = spm_select('FPList',pth, ...  % warped
@@ -260,7 +246,7 @@ fn_wCimg  = spm_select('FPList',pth, ...  % warped
 fn_mwCimg = spm_select('FPList',pth, ...  % modulated warped
     ['^mwc[0-9].*',spm_file(fn_Img2segm(1,:),'basename'),'\.nii$']);
 
-% When using seperate GM for BG, i.e. extended TPM, then it is usefull to 
+% When using seperate GM for BG, i.e. extended TPM, then it is usefull to
 % recombine GM-w/o-BG with GM-BG
 %  -> add c8 onto c1 -> only 1 image (c1) with GM + c8 with GM-BG.
 % Use a specific sub-function to preserve informations!
@@ -339,17 +325,17 @@ end
 fn_warp = spm_file(fn_Img2segm(1,:),'prefix','y_');
 % Apply on all images: structs + others, if available
 
-% fn_img2warp = {fn_in{3}}; % Use Struc images, Ref image not necessary 
-fn_img2warp = fn_in(3); % Use Struc images, Ref image not necessary 
+% fn_img2warp = {fn_in{3}}; % Use Struc images, Ref image not necessary
+fn_img2warp = fn_in(3); % Use Struc images, Ref image not necessary
 if ~isempty(fn_in{4})
     fn_img2warp = {char(fn_img2warp{1} , fn_in{4})};
 end
 
 clear matlabbatch
 opt = struct( ...
-        'bb', [-78 -112 -70 ;78 76 85], ...
-        'vox', [1 1 1], ...
-        'interp', 4 );
+    'bb', [-78 -112 -70 ;78 76 85], ...
+    'vox', [1 1 1], ...
+    'interp', 4 );
 [matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp,opt);
 spm_jobman('run', matlabbatch);
 
@@ -361,12 +347,33 @@ else
     fn_warped_Oth = '';
 end
 
+% Apply the final ICV mask on Struct & Others
+if options.ICVmsk % ICV-mask the Struct & others
+    fn_tmp = [];
+    for ii=1:nStruc
+        fn_wStruc_ii = deblank(fn_warped_Struc(ii,:));
+        fn_tmp = char(fn_tmp, ...
+            mask_img(fn_wStruc_ii,fn_wICV,'k'));
+    end
+    fn_warped_Struc = fn_tmp(2:end,:);
+    % Mask other images too!
+    fn_tmp = [];
+    for ii=1:nOth
+        fn_wOth_ii = deblank(fn_warped_Oth(ii,:));
+        fn_tmp = char(fn_tmp, ...
+            mask_img(fn_wOth_ii,fn_wICV,'k'));
+    end
+    if nOth
+        fn_warped_Oth = fn_tmp(2:end,:);
+    end
+end
+
 %% 7. Collect all the image filenames created
 % - fn_out :
 %       ICVmsk      : intra-cranial volume mask, as generated from USwL
 %       wICVmsk     : intra-cranial volume mask, as generated from USwL
-%       kStruc_i    : fixed (masked a/o modulated) i^th structural images, if created 
-%       kOth_i      : masked i^th other image
+%       Struc_i     : fixed (masked a/o modulated) i^th structural images, if created
+%       Oth_i       : masked i^th other image
 %       wStruc_i    : warped (masked/modulated) i^th structural image
 %       wOth_i      : warped (masked) i^th other image
 %       TPMl        : subject specific TPM with lesion
@@ -380,23 +387,22 @@ end
 fn_out.ICVmsk = {fn_ICV};
 fn_out.wICVmsk = {fn_wICV};
 
+% Struc/Oth images innative space, after masking and/or bias correction
 if options.ICVmsk || exist_mStruc;
     for ii=1:nStruc
-        fn_out.(sprintf('kStruc_%d',ii)) = {deblank(fn_ICV_in3(ii,:))};
+        fn_out.(sprintf('Struc_%d',ii)) = {deblank(fn_ICV_in3(ii,:))};
     end
 end
 if options.ICVmsk && nOth
     for ii=1:nOth
-        fn_out.(sprintf('kOth_%d',ii)) = {deblank(fn_in{4}(ii,:))};
+        fn_out.(sprintf('Oth_%d',ii)) = {deblank(fn_ICV_in4(ii,:))};
     end
 end
 
-if ~isempty(fn_warped_Struc) % warped MPMs
-    for ii=1:size(fn_warped_Struc,1)
-        fn_out.(sprintf('wStruc_%d',ii)) = {deblank(fn_warped_Struc(ii,:))};
-    end
+% Resulting warped Struc/Oth images
+for ii=1:size(fn_warped_Struc,1)
+    fn_out.(sprintf('wStruc_%d',ii)) = {deblank(fn_warped_Struc(ii,:))};
 end
-
 if ~isempty(fn_warped_Oth)
     for ii=1:size(fn_warped_Oth,1) % warped Others
         fn_out.(sprintf('wOth_%d',ii)) = {deblank(fn_warped_Oth(ii,:))};
@@ -425,14 +431,13 @@ fn_out.segmImg.mwc4 = {deblank(fn_mwCimg(4,:))}; % modulated warped CSF
 fn_out.segmImg.rc1 = {deblank(fn_rCimg(1,:))}; % modulated warped GM
 fn_out.segmImg.rc2 = {deblank(fn_rCimg(2,:))}; % modulated warped WM
 fn_out.segmImg.rc3 = {deblank(fn_rCimg(3,:))}; % modulated warped Lesion
-
 end
 
 % =======================================================================
 %% SUBFUNCTIONS
 % =======================================================================
 
-%% STEP 1: 
+%% STEP 1:
 % Removing small lesion patches from mask
 function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minVol,nDilate)
 % 1) Trim a mask image by removing bits that would be too small to really
@@ -521,8 +526,8 @@ fn_dtMsk = V_nM.fname;
 
 end
 
-%% STEP 3: 
-% Creating the normalization batch to 
+%% STEP 3:
+% Creating the normalization batch to
 %   + normalize the masked structural image
 %   + generate an ICV mask
 
@@ -567,7 +572,7 @@ for ii=1:6
 end
 matlabbatch{3}.spm.spatial.preproc.warp.mrf = segm_def.mrf;
 matlabbatch{3}.spm.spatial.preproc.warp.cleanup = segm_def.cleanup; %% the cleanup is ad-hoc by default leave 1
-matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2]*scDefReg; 
+matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2]*scDefReg;
 matlabbatch{3}.spm.spatial.preproc.warp.affreg = 'mni';
 matlabbatch{3}.spm.spatial.preproc.warp.fwhm = 0;
 matlabbatch{3}.spm.spatial.preproc.warp.samp = 3;
@@ -585,13 +590,13 @@ matlabbatch{5}.spm.spatial.smooth.prefix = 's';
 
 end
 
-%% STEP 4: 
+%% STEP 4:
 % Updating the TPM with an extra class, the lesion
 % Note that in the resulting TPM the lesion is inserted in *3rd position*,
 % i.e. between WM and CSF!
 function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 % fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
-% 
+%
 % Implicit smoothing is 4mm!!!
 %
 % INPUT
@@ -676,7 +681,7 @@ prob_l_possible = double(prob_l_possible)/255;
 % 3) concatenate by setting lesion at last position & adjust 'other' class
 tpm_Lu = (1-1/opt.tpm_ratio)*tpm_l.*tpm_healthy; % update lesion tpm
 l_les_possible = find( (prob_l_possible(:)*opt.min_tpm_icv>tpm_Lu(:)) ...
-                     & (prob_l_possible(:)>0) );
+    & (prob_l_possible(:)>0) );
 tpm_Lu(l_les_possible) = prob_l_possible(l_les_possible)*opt.min_tpm_icv; % min_tpm_icv x prob of possible lesion
 tpm_Lu(tpm_Lu<opt.min_tpm) = opt.min_tpm; % at least min_tpm everywhere
 tpm_ext = cat(4,tpm_orig,tpm_Lu); % put lesion at the end
@@ -795,7 +800,7 @@ end
 
 end
 
-%% STEP 5: 
+%% STEP 5:
 % Creating the segmentatin batch with 7 (or 8) tissue clasess
 % + smoothing of modulated warped tissue classes
 function [matlabbatch] = crt_batch_USwL(P,Ptpm_l,opt)
@@ -893,7 +898,7 @@ matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1];
 
 end
 
-%% STEP 6: 
+%% STEP 6:
 % Creating the normalization batch for the MPM
 function [matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp,opt)
 % [malabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp, opt)
@@ -903,7 +908,7 @@ function [matlabbatch] = crt_batch_normalize_StrucOth(fn_img2warp,fn_warp,opt)
 % - fn_wapr  : file name of warping image
 % - opt      : option structure
 %   .bb      : bounding box [def. [-78 -112 -70 ;78 76 85]]
-%   .vox     : voxel size [def. [1 1 1]mm3] 
+%   .vox     : voxel size [def. [1 1 1]mm3]
 %   .interp  : interpolation scheme [def. 4]
 
 if nargin<3
@@ -946,3 +951,67 @@ Vo.fname = fn_kimg;
 Vo = spm_imcalc(Vi,Vo,'i1.*(i2>0)');
 
 end
+
+% 
+% %% TESTING: 
+% % If you want to quickly test the output to sort out the matlabbatch
+% % dependencies, then just 
+% % - copy this bit of code *around* the mainpart of the function code
+% % - set the flag 'TESTING' to true. 
+% % No calculationwill be performed but files (which should already exist on 
+% % your HD) will be selected instead and passed to any following module.
+% TESTING = false;
+% if ~TESTING
+% % <PUT MAIN CODE HERE
+% else % For testing just pick up existing pathnames.
+%     % ICV
+%     fn_out.ICVmsk = {spm_select('FPList',pth,'^icv_.*_A\.nii')};
+%     fn_out.wICVmsk = {spm_select('FPList',pth,'^wicv_.*_A\.nii')};
+%     % Struc
+%     fn_ICV_in3 = spm_select('FPList',pth,'^kks.*\.nii');
+%     for ii=1:nStruc
+%         fn_out.(sprintf('Struc_%d',ii)) = {deblank(fn_ICV_in3(ii,:))};
+%     end
+%     % Oth
+%     fn_ICV_in4 = spm_select('FPList',fullfile(pth,'FLAIR'),'^kkr.*\.nii');
+%     for ii=1:nOth
+%         fn_out.(sprintf('Oth_%d',ii)) = {deblank(fn_ICV_in4(ii,:))};
+%     end
+%     % wStruc
+%     fn_ICV_in3 = spm_select('FPList',pth,'^kwks.*\.nii');
+%     for ii=1:nStruc
+%         fn_out.(sprintf('wStruc_%d',ii)) = {deblank(fn_ICV_in3(ii,:))};
+%     end
+%     % wOth
+%     fn_ICV_in4 = spm_select('FPList',fullfile(pth,'FLAIR'),'^kwkr.*\.nii');
+%     for ii=1:nOth
+%         fn_out.(sprintf('wOth_%d',ii)) = {deblank(fn_ICV_in4(ii,:))};
+%     end
+%     % subject specific TPM with lesion
+%     fn_TPMl = spm_select('FPList',fullfile(pth,'FLAIR'),'^eTPM.*les\.nii');
+%     fn_out.TPMl = {fn_TPMl};
+%     
+%     fn_Cimg = spm_select('FPList',pth,'^c[1234].*_A\.nii');
+%     fn_wCimg = spm_select('FPList',pth,'^wc[1234].*_A\.nii');
+%     fn_mwCimg = spm_select('FPList',pth,'^mwc[1234].*_A\.nii');
+%     fn_rCimg = spm_select('FPList',pth,'^rc[123].*_A\.nii');
+%     % segmented tissues
+%     fn_out.segmImg.c1 = {deblank(fn_Cimg(1,:))}; % GM
+%     fn_out.segmImg.c2 = {deblank(fn_Cimg(2,:))}; % WM
+%     fn_out.segmImg.c3 = {deblank(fn_Cimg(3,:))}; % Lesion
+%     fn_out.segmImg.c4 = {deblank(fn_Cimg(4,:))}; % CSF
+%     % warped segmented tissues
+%     fn_out.segmImg.wc1 = {deblank(fn_wCimg(1,:))}; % warped GM
+%     fn_out.segmImg.wc2 = {deblank(fn_wCimg(2,:))}; % warped WM
+%     fn_out.segmImg.wc3 = {deblank(fn_wCimg(3,:))}; % warped Lesion
+%     fn_out.segmImg.wc4 = {deblank(fn_wCimg(4,:))}; % warped CSF
+%     % modulated warped segmented tissues
+%     fn_out.segmImg.mwc1 = {deblank(fn_mwCimg(1,:))}; % modulated warped GM
+%     fn_out.segmImg.mwc2 = {deblank(fn_mwCimg(2,:))}; % modulated warped WM
+%     fn_out.segmImg.mwc3 = {deblank(fn_mwCimg(3,:))}; % modulated warped Lesion
+%     fn_out.segmImg.mwc4 = {deblank(fn_mwCimg(4,:))}; % modulated warped CSF
+%     % Dartel ready segmented tissues
+%     fn_out.segmImg.rc1 = {deblank(fn_rCimg(1,:))}; % modulated warped GM
+%     fn_out.segmImg.rc2 = {deblank(fn_rCimg(2,:))}; % modulated warped WM
+%     fn_out.segmImg.rc3 = {deblank(fn_rCimg(3,:))}; % modulated warped Lesion
+% end
