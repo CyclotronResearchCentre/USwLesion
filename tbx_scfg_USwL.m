@@ -286,9 +286,8 @@ ICVmsk.help    = {['An ICV mask is created from the reference structural ', ...
     'is equivalent to "skull stripping". This helps, in some cases, the ', ...
     'multi-channel segmentation of the MPMs.']
     ['After the main USwL step, a final ICV mask is also created and ',...
-    'applied on all the images and tissue maps.']
-    ['Note that the TPMs are also masked so that the images to segment ',...
-    'and TPMs match together.']
+    'would be applied on all the images and tissue maps.']
+    'Note that the (warped) ICV mask images are always created .'
     'The masked Struc/Other images are prefixed with ''k''.'};
 ICVmsk.labels = {
     'No'
@@ -341,68 +340,63 @@ end
 %% OUTPUT functions
 %_______________________________________________________________________
 function dep = vout_USwL(job) %#ok<*INUSD>
-
-% TPM_lesion
-cdep = cfg_dep;
-cdep.sname      = 'Subject''s TPM with Lesion';
-cdep.src_output = substruct('.','TPMl');
-% cdep.tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
-cdep.tgt_spec   = cfg_findspec({{'filter','nifti'}});
-
-% Warped struct-ref
-cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-cdep(end).sname      = 'Warped struct-ref';
-cdep(end).src_output = substruct('.','wstruct');
-cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+% Collecting the output from crc_USwL function:
+% - fn_out :
+%       ICVmsk      : intra-cranial volume mask, as generated from USwL
+%       wICVmsk     : intra-cranial volume mask, as generated from USwL
+%       Struc_i     : fixed (masked a/o modulated) i^th structural images, if created
+%       Oth_i       : masked i^th other image
+%       wStruc_i    : warped (masked/modulated) i^th structural image
+%       wOth_i      : warped (masked) i^th other image
+%       TPMl        : subject specific TPM with lesion
+%       segmImg     : structure with posterior tissue probabilities
+%           c(i)    : class #i in subject space (1-4)
+%           wc(i)   : class #i in MNI space (1-4)
+%           mwc(i)  : modulated class #i in MNI space (1-4)
+%           rc(i)   : DARTEL  ready class #i in subject space (1-3)
 
 % ICV mask
+cdep            = cfg_dep; %#ok<*AGROW>
+cdep.sname      = 'Subject''s ICV mask, native space';
+cdep.src_output = substruct('.','ICVmsk');
+cdep.tgt_spec   = cfg_findspec({{'filter','nifti'}});
+
+% wICV mask
 cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-cdep(end).sname      = 'Subject''s ICV mask, native space';
-cdep(end).src_output = substruct('.','ICVmsk');
+cdep(end).sname      = 'Subject''s ICV mask, template space';
+cdep(end).src_output = substruct('.','wICVmsk');
 cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 
-% % Thresholded MPM + Mask
-% if job.options.thrMPM
-%     for ii=1:numel(job.imgStruc)
-%         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-%         cdep(end).sname      = sprintf('Fixed MPM image #%d',ii);
-%         cdep(end).src_output = substruct('.',sprintf('fxMPM_%d',ii));
-%         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
-%     end
-%     for ii=1:numel(job.imgStruc)
-%         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-%         cdep(end).sname      = sprintf('Fix-mask MPM #%d',ii);
-%         cdep(end).src_output = substruct('.',sprintf('fxMPMmsk_%d',ii));
-%         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
-%     end
-% end
-
-% ICV-masked MPM
-if job.options.ICVmsk
-    for ii=1:min(numel(job.imgStruc),1)
+% ICV-masked Struc & Other
+if job.options.ICVmsk || ... % masking or bias corrected
+        (isfield(job.options.bias,'bias_yes') && ...
+         job.options.bias.bias_yes.biaswr(2))
+    for ii=1:max(numel(job.imgStruc),1) % At least one image, the Ref struct.
         cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-        cdep(end).sname      = sprintf('ICV-masked Struct #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('kStruct_%d',ii));
+        cdep(end).sname      = sprintf('Corrected Struc #%d',ii);
+        cdep(end).src_output = substruct('.',sprintf('Struc_%d',ii));
         cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
     end
-    for ii=1:numel(job.imgOth)
-        cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-        cdep(end).sname      = sprintf('ICV-masked Other #%d',ii);
-        cdep(end).src_output = substruct('.',sprintf('kOth_%d',ii));
-        cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+    if ~isempty(job.imgOth) && ...
+            ~( strcmp(job.imgOth,'<UNDEFINED>') || isempty(job.imgOth{1}) )
+        for ii=1:numel(job.imgOth)
+            cdep(end+1)          = cfg_dep; %#ok<*AGROW>
+            cdep(end).sname      = sprintf('Corrected Other #%d',ii);
+            cdep(end).src_output = substruct('.',sprintf('Oth_%d',ii));
+            cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+        end
     end
 end
 
-% Warped MPM
-for ii=1:min(numel(job.imgStruc),1)
+% Warped Struc & Other
+for ii=1:max(numel(job.imgStruc),1) % At least one image, the Ref struct.
     cdep(end+1)          = cfg_dep; %#ok<*AGROW>
-    cdep(end).sname      = sprintf('Warped Struct image #%d',ii);
-    cdep(end).src_output = substruct('.',sprintf('wStruct_%d',ii));
+    cdep(end).sname      = sprintf('Warped Struc image #%d',ii);
+    cdep(end).src_output = substruct('.',sprintf('wStruc_%d',ii));
     cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
-
-% Warped Other
-if ~isempty(job.imgOth)
+if ~isempty(job.imgOth) && ...
+        ~( strcmp(job.imgOth,'<UNDEFINED>') || isempty(job.imgOth{1}) )
     for ii=1:numel(job.imgOth)
         cdep(end+1)          = cfg_dep;
         cdep(end).sname      = sprintf('Warped Other image #%d',ii);
@@ -434,6 +428,21 @@ for ii=1:4
     cdep(end).src_output = substruct('.','segmImg','.',sprintf('mwc%d',ii));
     cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
 end
+
+% Dartel-ready segmented images in subject space
+for ii=1:3
+    cdep(end+1)          = cfg_dep;
+    cdep(end).sname      = sprintf('c%d image',ii);
+    cdep(end).src_output = substruct('.','segmImg','.',sprintf('rc%d',ii));
+    cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+end
+
+% TPM_lesion
+cdep(end+1) = cfg_dep;
+cdep(end).sname      = 'Subject''s TPM with Lesion';
+cdep(end).src_output = substruct('.','TPMl');
+cdep(end).tgt_spec   = cfg_findspec({{'filter','nifti'}});
+
 
 dep = cdep;
 
