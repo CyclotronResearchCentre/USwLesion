@@ -1,7 +1,6 @@
-function FxMsk = tbx_scfg_Utils_FxMsk
+function FxICVmsk = tbx_scfg_Utils_FxICVmsk
 % MATLABBATCH sub-configuration file.
-% Applying tissue spcific smoothing in order to limit partial volume 
-% effect. This is specifically useful for the quantitative MPM images.
+% Small tool to fix an ICV mask
 %_______________________________________________________________________
 % Copyright (C) 2015 Cyclotron Research Centre
 
@@ -9,16 +8,15 @@ function FxMsk = tbx_scfg_Utils_FxMsk
 % Cyclotron Research Centre, University of Liege, Belgium
 
 % ---------------------------------------------------------------------
-% fnMsk Filename of mask to be fixed
+% fnICVmsk Filename of ICV mask to be fixed
 % ---------------------------------------------------------------------
-fnMsk         = cfg_files;
-fnMsk.tag     = 'fnMsk';
-fnMsk.name    = 'Mask image to be fixed';
-fnMsk.help    = {'Mask image, e.g. an intracranial volume (ICV) mask to be fixed.', ...
+fnICVmsk         = cfg_files;
+fnICVmsk.tag     = 'fnICVmsk';
+fnICVmsk.name    = 'ICV mask image to be fixed';
+fnICVmsk.help    = {'ICV (intracranial volume) mask image to be fixed.', ...
     'If multiple images are selected, they are processed one by one.'};
-fnMsk.filter = 'image';
-% fnMsk.ufilter = '.*';
-fnMsk.num     = [1 Inf];
+fnICVmsk.filter = 'image';
+fnICVmsk.num     = [1 Inf];
 
 %--------------------------------------------------------------------------
 % SzThr Size threshold
@@ -42,17 +40,17 @@ options.help    = {'Some processing options.'};
 
 %% EXEC function
 %----------------------------------------------------------------------
-% FxMsk Fixing some mask image(s)
+% FxICVmsk Fixing some mask image(s)
 % ---------------------------------------------------------------------
-FxMsk        = cfg_exbranch;
-FxMsk.tag    = 'FxMsk';
-FxMsk.name   = 'Fixing mask image';
-FxMsk.val    = {fnMsk options};
-FxMsk.help   = {'Fixing a mask image, e.g. an intracranial volume (ICV) mask, by', ...
+FxICVmsk        = cfg_exbranch;
+FxICVmsk.tag    = 'FxICVmsk';
+FxICVmsk.name   = 'Fixing ICV mask image';
+FxICVmsk.val    = {fnICVmsk options};
+FxICVmsk.help   = {'Fixing an ICV (intracranial volume) mask image by', ...
     '1/ filling small holes, based on #voxel threshold (1000mm^3 by def.)', ...
     '2/ removing blobs outside brain, i.e. the biggest blob'};
-FxMsk.prog   = @crc_run_FxMsk;
-FxMsk.vout   = @vout_MPMsmoothn;
+FxICVmsk.prog   = @crc_run_FxICVmsk;
+FxICVmsk.vout   = @vout_MPMsmoothn;
 
 end
 
@@ -66,7 +64,7 @@ cdep(1).sname = 'Fixed maxk image(s)';
 cdep(1).src_output = substruct('.','files');
 cdep(1).tgt_spec   = cfg_findspec({{'filter','image'}});
 
-% nMsk = size(job.fnMsk,1);
+% nMsk = size(job.fnICVmsk,1);
 % for ii=1:nMsk
 %     dep(ii) = cfg_dep; %#ok<*AGROW>
 %     
@@ -89,12 +87,12 @@ end
 %_______________________________________________________________________
 %% RUN function
 %_______________________________________________________________________
-function out = crc_run_FxMsk(job)
+function out = crc_run_FxICVmsk(job)
 
-nMsk = size(job.fnMsk,1);
+nMsk = size(job.fnICVmsk,1);
 fn = cell(nMsk,1);
 for ii=1:nMsk
-    fn{ii} = crc_fix_ICV(job.fnMsk{ii},job.options);
+    fn{ii} = crc_fix_ICV(job.fnICVmsk{ii},job.options);
 end
 
 % out.files = {cellstr(char(fn))};
