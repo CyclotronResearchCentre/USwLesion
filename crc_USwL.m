@@ -454,7 +454,7 @@ if nargin<3
     nDilate = 2;
 end
 if nargin<2
-    minNr = 8;
+    minVol = 8; % minimum volume of individual lesion (mm^3)
 end
 
 % 1) Load things
