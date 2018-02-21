@@ -5,7 +5,7 @@ function fn_out = crc_build_ICVmsk(fn_in,opt)
 % - adding the tissue class images together -> all voxels get a p-ICV
 % - smoothing (4 mm FHWM) -> enlarges things a bit
 % - thresholding at .3 to keep those really in the ICV
-% - fixing the obtained mask in different ways (see crc_fix_msk.m)
+% - fixing the obtained mask in different ways (see crc_fix_ICV.m)
 % 
 % Other operations include creating a (smoothed) normalized ICV-mask,
 % depending on the options selected.
@@ -79,7 +79,7 @@ opt_fx_mask.sz_thr = 1000;
 if ~isempty(opt.fn_iwarp)
     opt_fx_mask.fn_iwarp = opt.fn_iwarp;
 end
-crc_fix_msk(fn_ICV,opt_fx_mask); % overwriting the file fn_ICV
+crc_fix_ICV(fn_ICV,opt_fx_mask); % overwriting the file fn_ICV
 
 %% Warping and smoothing, if requested
 if ~isempty(opt.fn_warp)

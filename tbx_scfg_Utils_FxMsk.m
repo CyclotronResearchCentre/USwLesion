@@ -94,7 +94,7 @@ function out = crc_run_FxMsk(job)
 nMsk = size(job.fnMsk,1);
 fn = cell(nMsk,1);
 for ii=1:nMsk
-    fn{ii} = crc_fix_msk(job.fnMsk{ii},job.options);
+    fn{ii} = crc_fix_ICV(job.fnMsk{ii},job.options);
 end
 
 % out.files = {cellstr(char(fn))};
