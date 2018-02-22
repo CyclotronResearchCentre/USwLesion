@@ -22,7 +22,8 @@ USwLutils.tag     = 'USwLutils';
 USwLutils.name    = 'US with Lesion Utilities';
 USwLutils.help    = {'Some utility functions for the US-with-Lesion tools.'
         }';
-USwLutils.values  = {tbx_scfg_Utils_FxICVmsk tbx_scfg_ParEx};
+USwLutils.values  = {tbx_scfg_Utils_FxLesMsk tbx_scfg_Utils_FxICVmsk ...
+    tbx_scfg_ParEx};
 
 %----------------------------------------------------------------------
 % Setting up main choices
