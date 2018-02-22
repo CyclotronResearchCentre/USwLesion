@@ -50,17 +50,16 @@ FxICVmsk.help   = {'Fixing an ICV (intracranial volume) mask image by', ...
     '1/ filling small holes, based on #voxel threshold (1000mm^3 by def.)', ...
     '2/ removing blobs outside brain, i.e. the biggest blob'};
 FxICVmsk.prog   = @crc_run_FxICVmsk;
-FxICVmsk.vout   = @vout_MPMsmoothn;
+FxICVmsk.vout   = @vout_FxICVmsk;
 
 end
 
 %% OUTPUT function
 %_______________________________________________________________________
-function dep = vout_MPMsmoothn(job) %#ok<*INUSD>
+function dep = vout_FxICVmsk(job) %#ok<*INUSD>
 
 cdep(1) = cfg_dep;
-cdep(1).sname = 'Fixed maxk image(s)';
-% dep(1).src_output = substruct('{}',{1});
+cdep(1).sname = 'Fixed mask image(s)';
 cdep(1).src_output = substruct('.','files');
 cdep(1).tgt_spec   = cfg_findspec({{'filter','image'}});
 
