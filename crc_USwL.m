@@ -43,14 +43,12 @@ function fn_out = crc_USwL(fn_in,options)
 %
 % OPERATIONS
 % Here are the main steps:
-%   1. "Trim 'n grow" the mask image {1} : -> t_Msk / dt_Msk
-%       - remov the "small" MS patches using a simple criteria: volume of
-%         patch must be >= minVol (mm3) -> t_Msk image
-%       - then grow volume by nDilate voxel(s) -> dt_Msk image
-%      minVol & nDilate are set in the crc_USwL_defaults file!
+%   1. "Trim 'n grow" the mask image {1} :
+%      Grow each cluster volume by nDilate voxel(s) -> dt_Msk image
+%      nDilate is set in the crc_USwL_defaults file!
 %   2. Apply the mask on the reference structural images {2} -> k_sRef
-%   3. Segment the masked structural (k_sRef), normalize the cleaned up
-%      mask (t_Msk) and smooth it
+%   3. Segment the masked structural (k_sRef), normalize the mask (t_Msk) 
+%      and smooth it
 %      -> new tissue probability map for the lesion
 %   4. Update the TPMs to include a 7th tissue class -> TPMms
 %   Note that the lesion is inserted in *3rd position*, between WM and CSF!

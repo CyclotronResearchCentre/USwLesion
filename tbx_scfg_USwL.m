@@ -248,7 +248,7 @@ bias_no.val     = {0};
 bias_no.help    = {'No bias correction.'};
 
 % ---------------------------------------------------------------------
-% Number of Gaussians per tissue class used to model the lesion
+% bias Should intensity bias correction be applied?
 % ---------------------------------------------------------------------
 bias        = cfg_choice;
 bias.tag    = 'bias';
