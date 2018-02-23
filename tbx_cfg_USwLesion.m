@@ -22,8 +22,11 @@ USwLutils.tag     = 'USwLutils';
 USwLutils.name    = 'US with Lesion Utilities';
 USwLutils.help    = {'Some utility functions for the US-with-Lesion tools.'
         }';
-USwLutils.values  = {tbx_scfg_Utils_FxLesMsk tbx_scfg_Utils_FxICVmsk ...
-    tbx_scfg_ParEx};
+USwLutils.values  = { ... Fixing
+    tbx_scfg_Utils_FxLesMsk ... % lesion mask (small blobs + intensities)
+    tbx_scfg_Utils_FxMPM ...    % qMRI/MPM, capping values [0 Max]
+    tbx_scfg_Utils_FxICVmsk ... % ICV mask
+    tbx_scfg_ParEx}; % Extracting parameters.
 
 %----------------------------------------------------------------------
 % Setting up main choices

@@ -74,9 +74,14 @@ uswl_def.msksegm.scDefReg   = 1; % scaling of warping regularisation,
 % properly captured and the lesion probability overlaps alrgely with prior
 % CSF map, leading to erroneous USwL later on.
 
+% Processing parameters for the cleaning/fixing of lesion mask and MPMs
+%==========================================================================
+uswl_def.ImgFix.minVol = 8; % volume of lesion patch must be > minVol (in mm^3)
+uswl_def.ImgFix.strMPM = {'_A', '_MT', '_R1', '_R2'}; % filename suffix used to pick image types
+uswl_def.ImgFix.thrMPM = [200 5 2000 .2]; % Corresponding thresholds for A, MT, R1 & R2.
+
 % Processing parameters for the creation of the updated TPM
 %==========================================================================
-uswl_def.uTPM.minVol        = 8; % volume of lesion patch must be > minVol (in mm^3)
 uswl_def.uTPM.nDilate       = 2; % # of dilation step
 uswl_def.uTPM.smoKern       = 2; % smoothing (in mm) of the warped lesion mask
 uswl_def.uTPM.tpm_ratio     = 100; % ratio of lesion/tpm
