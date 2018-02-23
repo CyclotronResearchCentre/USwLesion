@@ -40,7 +40,8 @@ minVol.name    = 'Size threshold (mm^3)';
 minVol.help    = {'Minimum size (mm^3) of smallest blobs that are kep.'};
 minVol.strtype = 'r';
 minVol.num     = [1 1];
-minVol.val     = {8};
+minVol.def     = @(val)crc_USwL_get_defaults('ImgFix.minVol', val{:});
+% minVol.val     = {8};
 
 % ---------------------------------------------------------------------
 % options Options
@@ -63,7 +64,7 @@ FxLesMsk.help   = {'Fixing lesion mask image(s) by', ...
     '1/ removing small blobs below some minimum volume', ...
     '2/ if available, removing blobs whos intenisty is too low compared to the lesion mean.', ...
     'For details on 2/ see the main function ''crc_fix_LesMsk.m''. Note also that this is qui experimental'};
-FxLesMsk.prog   = @crc_run_FxLesMsk;
+FxLesMsk.prog   = @run_FxLesMsk;
 FxLesMsk.vout   = @vout_FxLesMsk;
 FxLesMsk.check   = @check_file_number;
 
@@ -83,7 +84,7 @@ end
 %_______________________________________________________________________
 %% RUN function
 %_______________________________________________________________________
-function out = crc_run_FxLesMsk(job)
+function out = run_FxLesMsk(job)
 % Work out case for multiple masks
 nMsk = size(job.fnMsk,1);
 fn = cell(nMsk,1);
