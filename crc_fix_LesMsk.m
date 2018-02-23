@@ -49,7 +49,7 @@ if nargin<2
     opt = struct;
 end
 opt_def = struct(...
-    'minVol', 8, ... % minimum volume of individual lesion (mm^3)
+    'minVol', crc_USwL_get_defaults('ImgFix.minVol'), ... % minimum volume of individual lesion (mm^3)
     'fn_oth', []);
 opt = crc_check_flag(opt_def,opt);
 
