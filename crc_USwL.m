@@ -129,7 +129,7 @@ opt = crc_USwL_get_defaults('uTPM');
 % - remov the "small" lesion patches using a simple criteria: volume of
 %   lesion patch must be > minVol -> creates on the drive t_Msk
 % - then grow volume by nDilate voxel(s) -> creates on the drive dt_Msk
-[fn_tMsk,fn_dtMsk] = mask_trimNgrow(fn_in{1},opt.minVol,opt.nDilate);
+[fn_tMsk,fn_dtMsk] = mask_checkNgrow(fn_in{1},opt.nDilate);
 
 %% 2. Apply the lesion mask on the reference structural images -> k_sRef
 fn_kRef = spm_file(fn_in{2},'prefix','k');
@@ -436,28 +436,19 @@ end
 % =======================================================================
 
 %% STEP 1:
-% Removing small lesion patches from mask
-function [fn_tMsk,fn_dtMsk] = mask_trimNgrow(P_in,minVol,nDilate)
-% 1) Trim a mask image by removing bits that would be too small to really
-%    matter according to medical criteria
-%   For example cf. E. Lommers and MS patients:
-%    "Lesions will ordinarily be larger than 3 mm in cross section"
-%    A cube of 2x2x2 mm^3 has a diagonal of sqrt(12)~3.4mm and
-%    and a volume of 8 mm^3 -> minVol = 8 [DEF]
-%   -> fn_tMsk used for the new TPM_ms
+function [fn_tMsk,fn_dtMsk] = mask_checkNgrow(P_in,nDilate)
+% Deal with mask
+% 1) Check mask intensities -> fn_tMsk
 % 2) Then grow the volume by nDilate voxels [2, DEF]
 %   -> fn_dtMsk used for the masking for the 1st warping
 
-if nargin<3
-    nDilate = 2;
-end
 if nargin<2
-    minVol = 8; % minimum volume of individual lesion (mm^3)
+    nDilate = 2;
 end
 
 % 1) Load things
 V = spm_vol(P_in);
-[Msk,XYZ] = spm_read_vols(V);
+[Msk,~] = spm_read_vols(V);
 
 % Ensures values are [0 1], in case scaling was wrong, e.g. [0 255], or
 % there are some tiny negative values, e.g. if mask was resampled
@@ -467,46 +458,21 @@ if max(Msk(:))>1 || min(Msk(:))<0
         min(Msk(:)), max(Msk(:)))
     Msk(Msk>.5) = 1; % non-zero values, as in >1e-6, set to 1
     Msk(Msk<0) = 0; % anything below zero set to zero.
-end
-
-XYZvx = V.mat\[XYZ ; ones(1,size(XYZ,2))];
-vx_vol = abs(det(V.mat(1:3,1:3)));
-minNr = minVol/vx_vol;
-
-% 2) Clean up
-lMsk  = find(Msk(:)>0);
-lXYZvx = XYZvx(1:3,(lMsk));
-vMsk = Msk(lMsk);
-[Ncl,Zcl,Mcl,Acl,XYZcl] = spm_max(vMsk,lXYZvx); %#ok<*NASGU,*ASGLU>
-
-nrA = max(Acl);
-l_all = ones(length(lMsk),1);
-n_rem = 0;
-for ii=1:nrA
-    % deal with regions, one by one
-    l_ii = find(Acl == ii);
-    n_ii = length(l_ii);
-    if n_ii<minNr
-        l_all(l_ii) = 0;
-        n_rem = n_rem+1;
-    end
-end
-Msk_nM = Msk;
-l_rem = find(l_all==0);
-Msk_nM(lMsk(l_rem)) = 0; %#ok<*FNDSB>
-
-% 4) Save 1st image fn_tMsk
-V_nM = V;
-V_nM.fname = spm_file(V.fname,'prefix','t');
-V_nM = spm_create_vol(V_nM);
-V_nM = spm_write_vol(V_nM,Msk_nM);
-fn_tMsk = V_nM.fname;
-
-% 5) dilate mask
-if nDilate
-    dMsk_nM = imdilate(~~Msk_nM,ones(3,3,3));
+    % Save 1st image fn_tMsk
+    V_nM = V;
+    V_nM.fname = spm_file(V.fname,'prefix','t');
+    V_nM = spm_create_vol(V_nM);
+    V_nM = spm_write_vol(V_nM,Msk);
+    fn_tMsk = V_nM.fname;
 else
-    dMsk_nM = ~~Msk_nM;
+    fn_tMsk = P_in;
+end
+
+% 2) dilate mask
+if nDilate
+    dMsk_nM = imdilate(~~Msk,ones(3,3,3));
+else
+    dMsk_nM = ~~Msk;
 end
 if nDilate>1
     for ii=1:nDilate-1
