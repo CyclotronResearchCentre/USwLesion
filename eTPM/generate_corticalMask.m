@@ -1,17 +1,16 @@
-%% Script to generate some masks for brain split
+%% Script to generate some masks for brain splitting
 % 
 % WHY:
 % For the MPMs analysis of MS patients, it's not unusual to look at
-% mean/std values over parts of the GM , e.g. the cortex.
-% Here we just split the brain GM into 3 main parts: cortex, cerrebellum
-% and subcortical.
+% mean/std values over sub-parts of the GM or WM, e.g. the cortex.
+% Here we just split the brain GM into a few parts, see list here under.
 %
 % HOW
-% We simply use the neuromorphometric atals provided in SPM12 and combine
-% the various 'patches' together into those 3 different masks.
+% We simply use the neuromorphometric atlas provided in SPM12 and combine
+% the various 'patches' together into those 6 different masks.
 % 
 % OUTPUT
-% A single file is generated, msk_BrainParts.nii, with 4 different volumes 
+% A single file is generated, msk_BrainParts.nii, with 6 different volumes 
 % covering the brain: 
 % 1. cortex without WM, 
 % 2. cortex with WM, 
