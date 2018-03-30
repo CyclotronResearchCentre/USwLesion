@@ -18,7 +18,7 @@
 % 4. cerebellum.
 % 5. subcortex without the Basal Ganglia
 % 6. Basal Ganglia only (pallidum, caudate, putamen, nucleaus accumbens,
-%   thamus proper)
+%   thalamus proper)
 % 
 % NOTE
 % For an individual subject, the masks generated likely include *both* GM
