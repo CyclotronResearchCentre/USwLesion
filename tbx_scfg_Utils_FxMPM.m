@@ -96,7 +96,7 @@ crFxMsk_no.help    = {'No mask of fixed voxels created.'};
 % ---------------------------------------------------------------------
 crFxMsk        = cfg_choice;
 crFxMsk.tag    = 'crFxMsk';
-crFxMsk.name   = 'Should a mask showing the fixed voxels be creates?';
+crFxMsk.name   = 'Should a mask showing the fixed voxels be created?';
 crFxMsk.values = {crFxMsk_no, crFxMsk_yes};
 crFxMsk.val    = {crFxMsk_no};
 crFxMsk.help   = {...
@@ -153,13 +153,11 @@ function out = run_FxMPM(job)
 % - fn_in   : filename of MPM images to fix
 % - opt     : option structure
 %       strMPM   : filename parts used to pick the image type.
-%                  [def. {'_A'    '_MT'    '_R1'    '_R2'}]
 %       thrMPM   : Max cap for the corresponding image type
-%                  [def. [200 5 2000 2]]
-%       prefix   : prefix added to filename. [def. 'fx_']
+%       prefix   : prefix added to filename.
 %       crt_mask : create a map indicating the voxels that were fixed
 %                  [def. false]
-%       fix_zeros: fix the zero-holes in the image. [def. true]
+%       fix_zeros: fix the zero-holes in the image.
 %
 % OUTPUT
 % - fn_out  : filename of fixed MPM images

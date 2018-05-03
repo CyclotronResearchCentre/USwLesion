@@ -9,13 +9,13 @@ function fn_out = crc_fix_MPMintens(fn_in,opt)
 % - zero's are filed by averaging the vaue of non-zero neighbours.
 % 
 % INPUT
-% - fn_in   : filename of MPM images to fix
+% - fn_in   : (char array of) filename(s) of MPM images to fix
 % - opt     : option structure
 %       strMPM   : filename parts used to pick the image type.
-%                  [def. {'_A'    '_MT'    '_R1'    '_R2'}]
+%                  [def. {'_PD'    '_MT'    '_R1'    '_R2s_OLS'}]
 %       thrMPM   : Max cap for the corresponding image type
-%                  [def. [200 5 2000 2]]
-%       prefix   : prefix added to filename. [def. 'fx_']
+%                  [def. [200 5 2.5 250]]
+%       prefix   : prefix added to filename. [def. 't']
 %       crt_mask : create a map indicating the voxels that were fixed  
 %                  [def. false]
 %       fix_zeros: fix the zero-holes in the image. [def. true]
@@ -33,23 +33,30 @@ function fn_out = crc_fix_MPMintens(fn_in,opt)
 
 %% Set defaults for Multi-Parametric Maps (MPM), aka. quantitative MRI (qMRI),
 % intensity correction and head-masking.
-tMPM.strMPM = {'_A', '_MT', '_R1', '_R2'}; % filename suffix used to pick image types
-tMPM.thrMPM = [200 5 2000 .2]; % Corresponding thresholds for A, MT, R1 & R2.
+tMPM.strMPM = {'_PD', '_MT', '_R1', '_R2s_OLS'}; % filename suffix used to pick image types
+tMPM.thrMPM = [200 5 2 250]; % Corresponding thresholds for PD, MT, R1 & R2s.
 
 %% Deal with input
 if nargin <2, opt = struct; end
 opt_o = struct(...
-    'prefix', 'fx_', ...
+    'prefix', 't', ...
     'strMPM', {tMPM.strMPM}, ...
     'thrMPM', tMPM.thrMPM, ...
     'crt_mask', false, ...
     'fix_zeros', true);
 opt = crc_check_flag(opt_o,opt);
 
+%% Check input images
+if iscell(fn_in)
+    % turn cell aray into char array, just in case.
+    fn_in = char(fn_in);
+end
 nMPM = size(fn_in,1);
 nSt = numel(opt.strMPM);
 fn_tmp = [];
-for ii=1:nMPM % Loop over MPM files
+
+%% Loop over MPM files
+for ii=1:nMPM 
     mtch = zeros(nSt,1);
     for jj=1:nSt
         tmp = strfind(spm_file(fn_in(ii,:),'filename'),opt.strMPM{jj});
@@ -57,10 +64,10 @@ for ii=1:nMPM % Loop over MPM files
     end
     [~,p_mtch] = max(mtch);
     if p_mtch
-        if exist(spm_file(fn_in(ii,:),'prefix','t'),'file')
+        if exist(spm_file(fn_in(ii,:),'prefix',opt.prefix),'file')
             % Already fixed
             fn_tmp = char( fn_tmp , ...
-                spm_file(fn_in(ii,:),'prefix','t'));
+                spm_file(fn_in(ii,:),'prefix',opt.prefix));
         else
             % Do the job
             fn_tmp = char( fn_tmp , ...
@@ -172,7 +179,7 @@ end
 
 % Save results
 Vc = V;
-Vc.fname = spm_file(V.fname,'prefix','t');
+Vc.fname = spm_file(V.fname,'prefix',prefix);
 Vc = spm_create_vol(Vc);
 Vc = spm_write_vol(Vc,dd);
 fn_out = Vc.fname;
