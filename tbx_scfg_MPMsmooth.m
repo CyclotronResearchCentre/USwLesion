@@ -21,16 +21,16 @@ wMPM.num     = [1 Inf];
 % wMPM.val       = {''};
 
 % ---------------------------------------------------------------------
-% wcImg Warped tissue class images
+% mwcImg Warped tissue class images
 % ---------------------------------------------------------------------
-wcImg         = cfg_files;
-wcImg.tag     = 'wcImg';
-wcImg.name    = 'Warped tissue class images';
-wcImg.help    = {'Select the warped tissue classes.'};
-wcImg.filter = 'image';
-% wcImg.ufilter = '^smwc.*';
-wcImg.ufilter = '^wc.*';
-wcImg.num     = [2 3];
+mwcImg         = cfg_files;
+mwcImg.tag     = 'mwcImg';
+mwcImg.name    = 'Modulated warped tissue class images';
+mwcImg.help    = {'Select the modulate warped tissue classes.'};
+mwcImg.filter = 'image';
+% mwcImg.ufilter = '^smwc.*';
+mwcImg.ufilter = '^mwc.*';
+mwcImg.num     = [2 3];
 
 % ---------------------------------------------------------------------
 % tpm_l Subject's TPM with lesion class
@@ -62,12 +62,12 @@ fwhm.val     = {8};
 MPMsmooth        = cfg_exbranch;
 MPMsmooth.tag    = 'MPMsmooth';
 MPMsmooth.name   = 'Partial volume smoothing';
-MPMsmooth.val    = {wMPM wcImg tpm_l fwhm};
+MPMsmooth.val    = {wMPM mwcImg tpm_l fwhm};
 % MPMsmooth.val    = {wMPM tpm_l fwhm tc_ind};
 MPMsmooth.help   = {['Applying tissue spcific smoothing in order to',...
     'limit partial volume effect. This is specifically useful for ',...
     'the quantitative MPM images.']};
-MPMsmooth.prog   = @crc_MPMsmooth;
+MPMsmooth.prog   = @tbx_run_MPMsmooth;
 MPMsmooth.vout   = @vout_MPMsmoothn;
 
 end
@@ -78,7 +78,7 @@ function dep = vout_MPMsmoothn(job) %#ok<*INUSD>
 
 img_c = 0;
 for ii=1:numel(job.wMPM)
-    for jj=1:numel(job.wcImg)
+    for jj=1:numel(job.mwcImg)
         img_c = img_c+1;
         cdep(img_c) = cfg_dep; %#ok<*AGROW>
         cdep(img_c).sname  = sprintf('fin%d_c%d image',[ii jj]);
@@ -93,4 +93,37 @@ dep = cdep;
 end
 %_______________________________________________________________________
 
+%% RUN function
+%_______________________________________________________________________
+function fn_out = tbx_run_MPMsmooth(job)
+% Applying tissue specific smoothing in order to limit partial volume
+% effect. This is specifically useful for the quantitative MPM images.
+
+fn_wMPM = char(job.wMPM);
+fn_mwTC = spm_file(char(job.mwcImg),'number','');
+
+% Find list of tissue classes, tc_ind
+tc_ind = [];
+for ii = 1:size(fn_mwTC,1)
+    p = strfind(deblank(fn_mwTC(ii,:)),'wc');
+    tc_ind = [tc_ind str2double(deblank(fn_mwTC(ii,p+2)))]; %#ok<*AGROW>
+end
+
+% Collect the TPM_l
+tpm = spm_file(char(job.tpm_l),'number','');
+fn_lTPM = char;
+for ii = tc_ind
+    fn_lTPM = char( fn_lTPM , [tpm,',',num2str(ii)]);
+end
+fn_lTPM(1,:) = [];
+
+opt_process = struct( ...
+    'fwhm', job.fwhm, ...
+    'tpm', fn_lTPM) ; % , ...
+
+% Do it!
+% fn_finMPM = crc_unifseg_MPMprocess(fn_wMPM, fn_mwTC, opt_process);
+fn_out.fn = crc_uswl_MPMsmooth(fn_wMPM, fn_mwTC, opt_process);
+
+end
 

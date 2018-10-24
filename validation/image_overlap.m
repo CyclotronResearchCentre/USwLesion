@@ -1,30 +1,36 @@
-function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
+function [mJ,mHd,overlap,other] = image_overlap(img1,img2,opt)
 
 % This function computes the matching between 2 3D images, based on
 % different measures:
 % - the modified Jaccard index
-% - the percentages of overlap between the two binary images.
+% - the overlap between the two binary images, in term of voxel and cluster 
+%   matching.
+% - the mean Hausdorff distance (border-to-border distance)
+% The 1st image can be seen as the source image and the 2nd as the
+% reference (ground truth) image.
 %
 % FORMAT:
 %   [mJ,mHd] = image_overlap(img1,img2,opt);
 %   [mJ,mHd,overlap] = image_overlap(img1,img2,opt);
 %
 % INPUT:
-%   - img1 and img2 are two image names or matrices, by default assuming
-%     these are binary images (but see opt below)
+%   - img1/img2 are two image names or matrices, by default assuming
+%     these are binary images (but see opt below).
 %     img1 can be seen as a source image and img2 as the reference
 %     (ground truth) image to computes overlap of source to the reference
 %     in that case only, is the overlap output a useful measure
 %   - opt is a structure with a few processing options
-%       .thr is the threshold applied to both images to binarize them,
-%            otherwise any non-zero value is considered as 1.
-%            By default, thr=0, i.e. no thresholding is performed.
+%       .thr  is the threshold applied to both images to binarize them,
+%             otherwise any non-zero value is considered as 1.
+%             By default, thr=0, i.e. no thresholding is performed.
 %       .mask is a binary image indicating which pixels/voxels
-%        have to be taken into account (name or matrix)
-%        By default, no masking, i.e. [].
-%       .v2r voxel-to-realworld coordinates transformation, for the case
-%            where 3D arrays are passed directly.
-%            By default, anisotropic of size 1mm3, i.e. eye(4).
+%             have to be taken into account (name or matrix)
+%             By default, no masking, i.e. [].
+%       .v2r  voxel-to-realworld coordinates transformation, for the case
+%             where 3D arrays are passed directly.
+%             By default, anisotropic of size 1mm3, i.e. eye(4).
+%       .HDBM force the Hausdorff Distance to rely only on matched blobs or
+%             not [false, default].
 %
 % OUTPUT:
 %   - mJ: the modified Jaccard index (see Ref here under)
@@ -46,9 +52,20 @@ function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
 %       .voxel.cm:   confusion matrix [ TP FN ; FP TN ] counts
 %       .voxel.mcc:  Matthews correlation coefficient  (see Ref here under)
 %       .voxel.CK:   Cohen's Kappa
+%       .voxel.vols: volume (mm^3) of the blobs in img1/2 + mask if provided
 %
-%       .cluster.tp: percentage of clusters in img1 roi matching img2
-%       .cluster.fp: percentage of clusters in img1 not matching any in img2
+%       .cluster.tp: percentage of clusters in img2 (reference) matched by 
+%                    some in img1 (prediction)
+%       .cluster.fp: percentage of clusters in img1 (prediction) not 
+%                    matching any in img2 (reference)
+%       .cluster.counts : 
+%               1st row = [#matches in reference #true clusters]
+%               2nd row = [#false positives in prediction #estimated clusters]
+%       .cluster.Nvx1/2 : number of voxels in each cluster in img1/2
+%       .cluster.NP : for each cluster in img2, number of voxels matching
+%                       some cluster in img1
+%       .cluster.NN : for each cluster in img1, number of voxels matching
+%                       some cluster in img2
 %
 % REFERENCES:
 % The Jaccard index (1910) is defined as
@@ -56,7 +73,7 @@ function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
 %   <https://en.wikipedia.org/wiki/Jaccard_index>
 %
 % The modified Jaccard index follows Maitra (2010)
-%   W(A,B) = N(intersect(A,B) / N(A)+N(B)-N(intersect(A,B))
+%   W(A,B) = N(intersect(A,B)) / N(A)+N(B)-N(intersect(A,B))
 %   <http://www.ncbi.nlm.nih.gov/pubmed/19963068>
 %
 % Haussdorf distance:
@@ -89,7 +106,8 @@ function [mJ,mHd,overlap] = image_overlap(img1,img2,opt)
 
 %%
 % *Check input data*
-opt_def = struct('thr',0,'mask',[],'v2r',eye(4)); % default options
+% default options
+opt_def = struct('thr',0,'mask',[],'v2r',eye(4),'HDBM',false);
 
 if nargin == 0
     display_help_and_example % Simple example with synthetic images
@@ -99,11 +117,11 @@ elseif nargin == 2
     opt = []; % Go with the defaults
     
 elseif nargin < 2 || nargin > 3
-    error('Two or three inputs are expected - FORMAT: [mJ,overlap] = percent_overlap(img1,img2,option)')
+    error('Two or three inputs are expected - FORMAT: [mJ,mHd,overlap] = percent_overlap(img1,img2,option)')
 end
 % Fill the opt structure with defaults
 opt = crc_check_flag(opt_def,opt);
-mJ = []; mHd = []; overlap = [];
+mJ = []; mHd = []; overlap = []; %#ok<*NASGU>
 
 %%
 % * Check fisrt images in*
@@ -116,7 +134,6 @@ if ischar(img1)
     if exist(img1,'file')
         V1 = spm_vol(img1);
         img1 =spm_read_vols(V1);
-        v2r = V1.mat;
     else
         error('the file %s doesn''t exist',spm_file(img1,'filename'))
     end
@@ -128,9 +145,12 @@ if ischar(img2)
     if exist(img2,'file')
         V2 = spm_vol(img2);
         img2 =spm_read_vols(V2);
+        v2r = V2.mat;
     else
         error('the file %s doesn''t exist',spm_file(img2,'filename'))
     end
+else
+    v2r = opt.v2r; % Use passed v2r or default one
 end
 
 % check dimensions
@@ -142,7 +162,7 @@ end
 % *Check the mask*
 
 mask = opt.mask;  % a mask field will be there, empty or not.
-if ~isempty(mask) % load if not empty
+if ~isempty(mask) % load/use if not empty
     if ischar(mask)
         if exist(mask,'file')
             V3 = spm_vol(mask);
@@ -163,6 +183,7 @@ if ~isempty(mask) % load if not empty
     else
         mask = (mask==0);
     end
+    vMsk_vx = sum(mask(:)==1);
 end
 
 %%
@@ -190,47 +211,55 @@ mJ = I / (sum(vimg1)+sum(vimg2)-I);
 
 %%
 % *Extract the mean Hausdorff distance*
-
-% Get border coordinates in vx, not considering the mask!
-if nargout >=2
-    [iBx1,iBy1,iBz1] = crc_borderVx(img1);
-    [iBx2,iBy2,iBz2] = crc_borderVx(img2);
-    
-    % Get coordinates in mm
-    Bxyz1_mm = v2r(1:3,1:3)* [iBx1' ; iBy1' ; iBz1'];
-    Bxyz2_mm = v2r(1:3,1:3)* [iBx2' ; iBy2' ; iBz2'];
-    
-    [mD,D12,D21] = crc_meanHausdorffDist(Bxyz1_mm,Bxyz2_mm);
-    mHd = mean(mD);
-end
+opt_HD.v2r = v2r;
+opt_HD.BMO = opt.HDBM;
+[mD,D12,D21,nDropped] = crc_imgHausdorffDist(img1,img2,opt_HD); %#ok<*ASGLU>
+mHd = mean(mD);
+other.nDropped = nDropped;
+other.mD = mD;
 
 %% Overlap measures to ground truth
 % ----------------------------------
 
-if nargout == 3
+if nargout >= 3
     
     %%
     % *Compute percentage of overalp at the cluster level*
     
     [L2,num2] = spm_bwlabel(double(img2),26);
-    if num2 >1
+    if num2 >0
         [L1,num1] = spm_bwlabel(double(img1),26);
         
         % for each cluster in img2 check if img1 has one too
+        NP = zeros(1,num2);
+        Nvx2 = zeros(1,num2);
         for n=1:num2
             NP(n) = length(intersect(find(img1),find(L2==n)));
             % divide by length(find(L2==n)) to get percentage per cluster;
+            Nvx2(n) = numel(find(L2==n));
         end
-        overlap.cluster.tp = length(find(NP)) / num2;
+        overlap.cluster.tp = sum(NP>0) / num2;
+        overlap.cluster.counts(1,1) = sum(NP>0); % #true positives
+        overlap.cluster.counts(1,2) = num2;      % #true clusters
+        overlap.cluster.Nvx2 = Nvx2;
+        overlap.cluster.NP = NP;
         
         % for each cluster in img1 check if img2 has one too
+        NN = zeros(1,num1);
+        Nvx1 = zeros(1,num1);
         for n=1:num1
             NN(n) = length(intersect(find(L1==n),find(img2)));
+            Nvx1(n) = numel(find(L1==n));
         end
         overlap.cluster.fp = sum(NN==0) / num1;
+        overlap.cluster.counts(2,1) = sum(NN==0); % #false positives
+        overlap.cluster.counts(2,2) = num1;       % #estimated clusters
+        overlap.cluster.Nvx1 = Nvx1;
+        overlap.cluster.NN = NN;
     else
         overlap.cluster.tp = [];
         overlap.cluster.fp = [];
+        overlap.cluster.counts = [];
     end
     
     
@@ -266,6 +295,14 @@ if nargout == 3
     Pr = (TP+TN)*(TP+FP)/sum(overlap.voxel.cm(:))^2;
     overlap.voxel.CK = (Po - Pr)/(1 - Pr);
     
+    % Voxel count
+    if ~isempty(mask)
+        vol_vx = [sum(vimg1) sum(vimg2) vMsk_vx];
+    else
+        vol_vx = [sum(vimg1) sum(vimg2)];
+    end
+    overlap.voxel.vols = vol_vx*abs(det(v2r)); 
+    
 end
 end
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -287,9 +324,10 @@ for move = 1:4
     img1(index1,index1) = 1;
     img2(index2,index2) = 1;
     subplot(2,2,move); imagesc(img1+img2); drawnow
-    A = image_overlap(img1,img2);
+    MJ = image_overlap(img1,img2);
     TP = (sum((img1(:)+img2(:))==2)) / sum(img2(:));
-    title(['overlap ' num2str(TP*100) '% mJ=' num2str(A)])
-    index1 = index1+1; index2 = index2 -1;
+    title(['overlap ' num2str(TP*100) '% mJ=' num2str(mJ)])
+    index1 = index1+1;
+	index2 = index2-1;
 end
 end

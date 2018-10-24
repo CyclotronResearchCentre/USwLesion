@@ -30,42 +30,64 @@ global uswl_def
 % Parameters for the segmentation with lesion 
 %==========================================================================
 uswl_def.segment.imgTpm     = {fullfile(spm('dir'),'tpm','TPM.nii')};
-uswl_def.segment.img4US     = 1;
-uswl_def.segment.tpm4lesion = 1;
-uswl_def.segment.biasreg    = 1e-05; % almost nothing, assuming we use MPMs
-uswl_def.segment.biasfwhm   = Inf; % no bias correction
+uswl_def.segment.tpm4lesion = 1; % TPM(s) affected by the lesion
+%                                   (0, GM; 1, WM; 2, GM+WM; 3, GM+WM+CSF) 
+uswl_def.segment.biasreg    = 1e-05; % almost nothing
+uswl_def.segment.biasfwhm   = Inf;   % no bias correction
 uswl_def.segment.biaswr     = [0 0]; % Not saving bias corrected/field images
-uswl_def.segment.NbGaussian = [2 2 2 2 3 4 2];
-uswl_def.segment.thrMPM     = 1;
+uswl_def.segment.NbGaussian = [2 2 3 2 3 4 2]; % GM/WM/lesion/CSF/skull/scalp/air
+% uswl_def.segment.thrMPM     = 1;
 uswl_def.segment.ICVmsk     = 1;
 uswl_def.segment.thrLesion  = 0;
 uswl_def.segment.mrf        = 2;
-uswl_def.segment.cleanup    = 1;
+uswl_def.segment.cleanup    = 0;
+uswl_def.segment.scDefReg   = 1; % scaling of warping regularisation,
+% A value <1 leads to more freedom for the warping.
+% This is useful for specific subjects where an extra bit of flexibility is
+% useful for this preliminary CFM-segmentation step.
+% Example:
+% Some multiple sclerosis (MS) patients have large lesion along the 
+% ventricles, which themselves are enlarged. With the standard CFM and 
+% warping regularization, then the true shape of the ventricles is not
+% properly captured and the lesion probability overlaps alrgely with prior
+% CSF map, leading to erroneous USwL later on.
 
-% Parameters for the segmentation of masked anatomican reference (to build
+% Parameters for the segmentation of masked anatomical reference (to build
 % the updated TPM)
 %==========================================================================
+uswl_def.msksegm.imgTpm     = {fullfile(spm('dir'),'tpm','TPM.nii')};
 uswl_def.msksegm.biasreg    = 1e-05; % almost nothing, assuming we use MPMs
-uswl_def.msksegm.biasfwhm   = Inf; % no bias correction
+uswl_def.msksegm.biasfwhm   = Inf;   % no bias correction
 uswl_def.msksegm.biaswr     = [0 0]; % Not saving bias corrected/field images
-uswl_def.msksegm.NbGaussian = [2 2 2 3 4 2]; % GM/WM/CSF/skull/scalp/air
+uswl_def.msksegm.NbGaussian = [2 2 2 3 4 4]; % GM/WM/CSF/skull/scalp/air
 uswl_def.msksegm.mrf        = 2;
-uswl_def.msksegm.cleanup    = 1;
+uswl_def.msksegm.cleanup    = 0;
+uswl_def.msksegm.native     = [[1 0];[1 0];[1 0];[0 0];[0 0];[0 0]]; 
+uswl_def.msksegm.scDefReg   = 1; % scaling of warping regularisation,
+% A value <1 leads to more freedom for the warping.
+% This is useful for specific subjects where an extra bit of flexibility is
+% useful for this preliminary CFM-segmentation step.
+% Example:
+% Some multiple sclerosis (MS) patients have large lesion along the 
+% ventricles, which themselves are enlarged. With the standard CFM and 
+% warping regularization, then the true shape of the ventricles is not
+% properly captured and the lesion probability overlaps alrgely with prior
+% CSF map, leading to erroneous USwL later on.
+
+% Processing parameters for the cleaning/fixing of lesion mask and MPMs
+%==========================================================================
+uswl_def.ImgFix.minVol = 8; % volume of lesion patch must be > minVol (in mm^3)
+uswl_def.ImgFix.strMPM = {'_A', '_MT', '_R1', '_R2'}; % filename suffix used to pick image types
+uswl_def.ImgFix.thrMPM = [200 5 2000 .2]; % Corresponding thresholds for A, MT, R1 & R2.
 
 % Processing parameters for the creation of the updated TPM
 %==========================================================================
-uswl_def.uTPM.minVol        = 8; % volume of lesion patch must be > minVol (in mm^3)
 uswl_def.uTPM.nDilate       = 2; % # of dilation step
 uswl_def.uTPM.smoKern       = 2; % smoothing (in mm) of the warped lesion mask
 uswl_def.uTPM.tpm_ratio     = 100; % ratio of lesion/tpm
 uswl_def.uTPM.min_tpm       = 1e-6; % minimum value of tpm overall, as in standard spm's TPM
 uswl_def.uTPM.min_tpm_icv   = 1e-3; % minimum value of tpm in intracranial volume
 uswl_def.uTPM.b_write       = [0 0]; % not writing bias corrected images, as in standard spm's TPM
-
-% Thresholding the MPM images
-%==========================================================================
-uswl_def.tMPM.strMPM = {'_A', '_MT', '_R1', '_R2'}; % filename parts
-uswl_def.tMPM.thrMPM = [200 5 2000 100]; % Thresholds for A, MT, R1 & R2.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %-Prevent users from making direct calls to spm_defaults

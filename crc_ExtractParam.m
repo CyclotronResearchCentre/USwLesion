@@ -73,6 +73,17 @@ res.match = struct( ...
     'N_union', N_union);
 
 %% 3. Volumes
+% Volume sor fractions to extract:
+% - TIV
+% - GMV = Cortical and Deep Grey matter
+% - WMV = NAWM + lesions
+% - Brain Parenchymal Fraction= (GMV+WMV)/TIV 
+% - Grey Matter Fraction = GMV/ TIV
+% - White Matter Fraction =  WMV/TIV
+% - Lesion Fraction = Lesion volume/TIV (more standard than relative than
+%   fraction of WMV)
+% - Lesion Fraction WM = Lesion volume/WMV
+
 clear matlabbatch
 fn_seg8 = spm_select('FPList',pth,'^kt.*_seg8\.mat$');
 matlabbatch{1}.spm.util.tvol.matfiles = {fn_seg8};

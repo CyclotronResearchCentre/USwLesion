@@ -15,6 +15,20 @@ if ~isdeployed,
 end
 
 %----------------------------------------------------------------------
+% Setting up 'Utils' modules
+%----------------------------------------------------------------------
+USwLutils         = cfg_choice;
+USwLutils.tag     = 'USwLutils';
+USwLutils.name    = 'US with Lesion Utilities';
+USwLutils.help    = {'Some utility functions for the US-with-Lesion tools.'
+        }';
+USwLutils.values  = { ... Fixing
+    tbx_scfg_Utils_FxLesMsk ... % lesion mask (small blobs + intensities)
+    tbx_scfg_Utils_FxMPM ...    % qMRI/MPM, capping values [0 Max]
+    tbx_scfg_Utils_FxICVmsk ... % ICV mask
+    tbx_scfg_ParEx}; % Extracting parameters.
+
+%----------------------------------------------------------------------
 % Setting up main choices
 %----------------------------------------------------------------------
 USwLtools         = cfg_choice;
@@ -26,6 +40,6 @@ USwLtools.help    = {
     ['One need to provide an (approximate) mask of the lesioned area(s)',...
     'in order to use this tool!']
     }';
-USwLtools.values  = {tbx_scfg_USwL tbx_scfg_MPMsmooth tbx_scfg_ParEx};
+USwLtools.values  = {tbx_scfg_USwL tbx_scfg_MPMsmooth USwLutils};
 
 end
