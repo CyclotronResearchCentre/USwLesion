@@ -91,7 +91,7 @@ if isempty(fn_in{4})
 else
     nOth = size(fn_in{4},1);
 end
-pth = spm_file(fn_in{2},'path');
+pth = spm_file(fn_in{3}(1,:),'path');
 
 % Deal with options
 if nargin<2, options = struct; end
