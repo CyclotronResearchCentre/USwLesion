@@ -270,7 +270,6 @@ NbGaussian.help    = {'Set the number of Gaussians per tissue class to model the
     'GM, WM, Lesion, CSF, Skull, Soft tissues, and Air.'], ...
     ['When using MPMs on "older" subject, it is useful to separately model ',...
     'the pallidum with an 8th tissue class, thus 8 number of Gausians.']};
-NbGaussian.strtype = 'n';
 NbGaussian.strtype = 'r';
 NbGaussian.num     = [1 Inf];
 NbGaussian.def     = @(val)crc_USwL_get_defaults('segment.NbGaussian', val{:});
