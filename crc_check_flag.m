@@ -34,6 +34,7 @@ f_names = fieldnames(flags_o);
 
 Nfields = length(f_names);
 ind_repl = zeros(1,Nfields);
+jump_line = false;
 for ii=1:Nfields
     % Update the output if
     % - a field is missing
