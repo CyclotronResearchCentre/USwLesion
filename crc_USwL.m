@@ -91,7 +91,7 @@ if isempty(fn_in{4})
 else
     nOth = size(fn_in{4},1);
 end
-pth = spm_file(fn_in{2},'path');
+pth = spm_file(fn_in{3}(1,:),'path');
 
 % Deal with options
 if nargin<2, options = struct; end
@@ -118,7 +118,7 @@ fn_tpm_USwL = options.imgTpm{1};
 fn_tpm_USwL = spm_file(fn_tpm_USwL,'number',''); % remove any number from SPM select
 Vtpm_USwL = spm_vol(fn_tpm_USwL);
 if numel(NbGaussian)~=(numel(Vtpm_USwL)+1)
-    error('There are %d tpm''s (incl. lesion) but only %d #Gaussians provided', ...
+    error('There are %d tpm''s (incl. lesion) but %d #Gaussians provided', ...
         numel(Vtpm_USwL)+1,numel(NbGaussian));
 end
 

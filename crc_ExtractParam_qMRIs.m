@@ -47,7 +47,7 @@ function [fn_out,res] = crc_ExtractParam_qMRIs(fn_img,opt)
 %           .N_c3       : #voxels in segmented lesion
 %           .N_intersec : #voxels in both segmented and lesion mask
 %           .N_union    : #voxels in segmented and/or lesion mask
-%      .tissueVol    : structu with volumic information (in liter or %)
+%      .tissueVol    : structure with volumic information (in liter or %)
 %           .volumes    : volumes of 3 or 4 tissue classes
 %           .tiv        : total intra cranial volume
 %           .gmv        : total GM volume
@@ -221,8 +221,8 @@ if opt.exe_ops(3)
     GMFrac = gmv/tiv*100; % expressed in percentage
     WMFrac = wmv/tiv*100; % expressed in percentage
     if ncImg ==4
-        LesFrac = volumes.litres(3)/tiv*100; % expressed in percentage
-        LesFracWM = volumes.litres(3)/wmv*100; % expressed in percentage
+        LesFrac = lesv/tiv*100; % expressed in percentage
+        LesFracWM = lesv/wmv*100; % expressed in percentage
     end
     
     tissueVol = struct(...

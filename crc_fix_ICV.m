@@ -1,7 +1,7 @@
 function fn_msk = crc_fix_ICV(fn_msk,opt)
 % Fixing a mask image, e.g. an intracranial volume (ICV) mask, by 
 % 1/ filling small holes, based on #voxel threshold (1000mm^3 by def.)
-% 2/ removing blobs outside brain, i.e. the biggest blob
+% 2/ removing blobs outside brain, i.e. keep the biggest blob
 % 3/ if some inverse warping (MNI->subj) is provided, adjust ICV mask with
 %    the SPM one. Simply adding both and checking overlap.
 %
