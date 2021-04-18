@@ -29,6 +29,8 @@ function [fn_out,nDropped] = crc_lesion_cleanup(fn_in,opt)
 %   .Nge      number of growing then eroding steps [def, [0 0]]
 %   .Nneighb  numbre of neighbours in 3D (6, 18 or 26) [def, 6], used for
 %             *both* eroding/growing AND the cluster size estimation.
+%   .RorigV   reassign original values [def, false]
+%             e.g. to recover the original posterior probabilities
 %
 % OUTPUT 
 % 
@@ -56,7 +58,8 @@ opt_def = struct( ...
     'prefix', 'c', ...  
     'Neg', [], ...      % -> no erode-grow
     'Nge', [], ...      % -> no grow-erode
-    'Nneighb',6);       % -> face-contact neghbour
+    'Nneighb',6, ...    % -> face-contact neghbour
+    'RorigV', false);   % -> keep the binarized map
 
 opt = crc_check_flag(opt_def,opt); % Check and pad filter structure
 
@@ -85,7 +88,6 @@ if ischar(fn_in)
     V_in = spm_vol(fn_in);
     data = spm_read_vols(V_in);
     save_img = true;
-    k_vx = round(opt.k/det(V_in.mat));
     k_vx = abs(round(opt.k/det(V_in.mat))); % avoid case where axis are flipped and voxel size <0
 else
     data = fn_in;
@@ -134,7 +136,7 @@ end
 extent_map = zeros(size(data));
 clustered_map = clustered_map(:);
 nv = histc(clustered_map,0:num);
-[~,idxall]=sort(clustered_map,'ascend');
+[~,idxall] = sort(clustered_map,'ascend');
 idxall(1:nv(1)) = []; nv(1)=[]; % remove 1st bin, i.e. 0s
 ends = cumsum(nv);
 inis = ends-nv+1;
@@ -160,12 +162,14 @@ else
 end
 
 %% Deal with output
-extent_map = extent_map .* data; % reasign the initial values
+if opt.RorigV
+    extent_map = extent_map .* data; % reasign the initial values
+end
 if save_img
     V_out = V_in;
     fn_out = spm_file(V_in.fname,'prefix',opt.prefix);
     V_out.fname = fn_out;
-    V_out.descrip = [V_out.descrip '; thresholded @ k=',num2str(k),' mm3'];
+    V_out.descrip = [V_out.descrip '; thresholded @ k=',num2str(opt.k),' mm3'];
     V_out.private.descrip = V_out.descrip;
     spm_write_vol(V_out,extent_map);
     fprintf('%s created \n',V_out.fname)
