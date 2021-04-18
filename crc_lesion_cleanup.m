@@ -86,6 +86,7 @@ if ischar(fn_in)
     data = spm_read_vols(V_in);
     save_img = true;
     k_vx = round(opt.k/det(V_in.mat));
+    k_vx = abs(round(opt.k/det(V_in.mat))); % avoid case where axis are flipped and voxel size <0
 else
     data = fn_in;
     save_img = false;
