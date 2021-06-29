@@ -577,7 +577,7 @@ function fn_TPMl = update_TPM_with_lesion(opt, fn_swtMsk)
 %               used to create the lesion tissue class
 
 % 0) select TPM and load
-[pth,fnam,ext,~] = spm_fileparts(opt.fn_tpm);
+[pth,fnam,ext,num] = spm_fileparts(opt.fn_tpm);
 fn_TPM = fullfile(pth,[fnam,ext]); % ensuring I load all TPMs together.
 Vtpm     = spm_vol(fn_TPM);
 tpm_orig = spm_read_vols(Vtpm);
@@ -730,7 +730,7 @@ end
 ltpm = [1:5 7:Ntpm_o+1];
 
 % Mask out with swICV, if provided
-if isfield(opt,'fn_swICV');
+if isfield(opt,'fn_swICV')
     V_swICV = spm_vol(opt.fn_swICV);
     swICV = spm_read_vols(V_swICV);
     for ii = ltpm
