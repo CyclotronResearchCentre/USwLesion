@@ -546,6 +546,9 @@ matlabbatch{4}.spm.spatial.normalise.write.subj.def(1) = cfg_dep('Segment: Forwa
 matlabbatch{4}.spm.spatial.normalise.write.subj.resample(1) = cfg_dep('Named File Selector: LesionMask(1) - Files', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','files', '{}',{1}));
 matlabbatch{4}.spm.spatial.normalise.write.woptions.bb = [-90 -126 -72 ; 90 90 108];
 matlabbatch{4}.spm.spatial.normalise.write.woptions.vox = [1.5 1.5 1.5];
+% MODIF by SB
+% voxel size must be equel to 1 1 1
+%matlabbatch{4}.spm.spatial.normalise.write.woptions.vox = [1 1 1];
 matlabbatch{4}.spm.spatial.normalise.write.woptions.interp = 1; % 1 -> trilinear, 0 -> NN
 matlabbatch{5}.spm.spatial.smooth.data(1) = cfg_dep('Normalise: Write: Normalised Images (Subj 1)', substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('()',{1}, '.','files'));
 matlabbatch{5}.spm.spatial.smooth.fwhm = smoKern*[1 1 1];
