@@ -130,7 +130,7 @@ opt = crc_USwL_get_defaults('uTPM');
 %   lesion patch must be > minVol -> creates on the drive t_Msk
 % - then grow volume by nDilate voxel(s) -> creates on the drive dt_Msk
 [fn_tMsk,fn_dtMsk] = mask_checkNgrow(fn_in{1},opt.nDilate);
-
+%Note_SB: No dilatation operation in the above function
 %% 2. Apply the lesion mask on the reference structural images -> k_sRef
 fn_kRef = spm_file(fn_in{2},'prefix','k');
 Vi(1) = spm_vol(fn_in{2});
@@ -470,25 +470,26 @@ else
 end
 
 % 2) dilate mask
-if nDilate
-    dMsk_nM = imdilate(~~Msk,ones(3,3,3));
-else
-    dMsk_nM = ~~Msk;
-end
-if nDilate>1
-    for ii=1:nDilate-1
-        dMsk_nM = imdilate(dMsk_nM,ones(3,3,3));
-    end
-end
-
-% 6) Save 2nd image fn_dtMsk
-V_nM = V;
-V_nM.fname = spm_file(V.fname,'prefix','dt');
-V_nM = spm_create_vol(V_nM);
-V_nM = spm_write_vol(V_nM,dMsk_nM);
-
-fn_dtMsk = V_nM.fname;
-
+% if nDilate
+%     dMsk_nM = imdilate(~~Msk,ones(3,3,3));
+% else
+%     dMsk_nM = ~~Msk;
+% end
+% if nDilate>1
+%     for ii=1:nDilate-1
+%         dMsk_nM = imdilate(dMsk_nM,ones(3,3,3));
+%     end
+% end
+% 
+% % 6) Save 2nd image fn_dtMsk
+% V_nM = V;
+% V_nM.fname = spm_file(V.fname,'prefix','dt');
+% V_nM = spm_create_vol(V_nM);
+% V_nM = spm_write_vol(V_nM,dMsk_nM);
+% 
+% fn_dtMsk = V_nM.fname;
+fn_dtMsk = fn_tMsk;
+%NB SB: not dilatation
 end
 
 %% STEP 3:
