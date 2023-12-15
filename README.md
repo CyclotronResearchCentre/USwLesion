@@ -1,11 +1,13 @@
-# USwLesion
+# US-with-Lesion
 Unified Segmentation with lesions in the brain
 
-The aim is to extend the "unified segmentation" (US, Ashburner et al. 2005) to brain images with lesional tissue. This was originally developed to process multiple sclerosis MR images. We are using the standard structural MRI but also [quantitative MR images](http://www.fil.ion.ucl.ac.uk/Research/physics_info/QuantMRI_VBM.html), aka. multi-parametric maps or MPM. There now exist a [`hMRI` toolbox](http://hmri.info) for the generation of these quantitative maps
+The aim is to extend the "unified segmentation" (US, Ashburner et al. 2005) to brain images with lesional tissue. This was originally developed to process multiple sclerosis MR images. We are using the standard structural MRI but also quantitative MR images, aka. multi-parametric maps or MPM. There now exist a [`hMRI` toolbox](http://hmri.info) for the generation of these quantitative maps.
 
-This development should lead to an SPM12 comaptible toolbox with a matlabbatch interface.
+A [poster](https://orbi.uliege.be/handle/2268/213972) was presented at the [OHBM conference in Vancouver (June 2017)](https://www.humanbrainmapping.org). A real paper will come out at some point, we are working on it...
+If you want to cite this work, at the moment, the only options are [OHBM abstract](https://orbi.uliege.be/handle/2268/228841) and [poster](https://orbi.uliege.be/handle/2268/213972), along with this GitHub page. Thanks!
 
-Here is how the code is organized:
+
+This development should lead to an SPM12 comaptible toolbox with a matlabbatch interface. Here is how the code is organized:
 - the matlabbatch configuration files are all the 'tbx_cfg_\*' and 'tbx_scfg_\*' files
 - the processing files are the 'crc_\*' files
 
