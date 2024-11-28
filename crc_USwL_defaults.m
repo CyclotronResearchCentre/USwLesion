@@ -51,6 +51,9 @@ uswl_def.segment.scDefReg   = 1; % scaling of warping regularisation,
 % warping regularization, then the true shape of the ventricles is not
 % properly captured and the lesion probability overlaps alrgely with prior
 % CSF map, leading to erroneous USwL later on.
+uswl_def.segment.rcombGM    = true; % recombing (or not) the 2 GM maps
+% if the GM is split into 2 sub-volumes, i.e. there are 8 tissue classes
+% with the lesion, then one could wish to output a single full GM maps.
 
 % Parameters for the segmentation of masked anatomical reference (to build
 % the updated TPM)
@@ -71,7 +74,7 @@ uswl_def.msksegm.scDefReg   = 1; % scaling of warping regularisation,
 % Some multiple sclerosis (MS) patients have large lesion along the 
 % ventricles, which themselves are enlarged. With the standard CFM and 
 % warping regularization, then the true shape of the ventricles is not
-% properly captured and the lesion probability overlaps alrgely with prior
+% properly captured and the lesion probability overlaps largely with prior
 % CSF map, leading to erroneous USwL later on.
 
 % Processing parameters for the cleaning/fixing of lesion mask and MPMs
