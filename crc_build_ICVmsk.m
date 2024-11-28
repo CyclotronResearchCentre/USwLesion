@@ -3,9 +3,10 @@ function fn_out = crc_build_ICVmsk(fn_in,opt)
 % these should be GM, WM & CSF at least.
 % This works by 
 % - adding the tissue class images together -> all voxels get a p-ICV
-% - smoothing (4 mm FHWM) -> enlarges things a bit
+% - smoothing (4 mm FHWM) -> cleans up and enlarges things a bit
 % - thresholding at .3 to keep those really in the ICV
-% - fixing the obtained mask in different ways (see crc_fix_ICV.m)
+% - fixing the obtained mask in different ways (see crc_fix_ICV.m) if
+%   either a "mask_sz_thr" or "fn_iwarp" is provided.
 % 
 % Other operations include creating a (smoothed) normalized ICV-mask,
 % depending on the options selected.
@@ -13,10 +14,12 @@ function fn_out = crc_build_ICVmsk(fn_in,opt)
 % INPUT
 % - fn_in   : filename of tissue classes to add together (char array)
 % - opt     : option structure
-%       fn_ref      : reference filename -> ['ICV_',fn_ref]
+%       fn_ref      : reference filename -> ['icv_',fn_ref]
+%       smoK        : kernel size (mm) for clean up smoothing [4, by def.]
 %       fn_warp     : forward warping -> create warped ICV
+%       msk_sz_thr  : max size (mm^3) of small blobs to be filled up [1000, def.]
 %       fn_iwarp    : inverse warping -> fix ICV mask with inv-warped SPM-ICV
-%       smoK        : kernel size (mm) of warped ICV smoothing (4, by def.)
+%       wsmoK       : kernel size (mm) of warped ICV smoothing [4, by def.]
 % 
 % OUTPUT
 % - fn_out
@@ -30,13 +33,15 @@ function fn_out = crc_build_ICVmsk(fn_in,opt)
 if nargin<2, opt = struct; end
 opt_o = struct( ...
     'fn_ref', [], ...
+    'smoK', 4, ...
     'fn_warp', [], ...
     'fn_iwarp', [], ...
-    'smoK', 4);
+    'msk_sz_thr', 1000, ...
+    'wsmoK', 4);
 opt = crc_check_flag(opt_o,opt);
-if numel(opt.smoK)~=3
-    opt.smoK = ones(1,3)*opt.smoK(1);
-end
+% Ensures smoothing kernels are 1x3 vectors
+if numel(opt.smoK)~=3, opt.smoK = ones(1,3)*opt.smoK(1); end
+if numel(opt.wsmoK)~=3, opt.wsmoK = ones(1,3)*opt.wsmoK(1); end
 
 if ~isempty(opt.fn_ref)
     fn_ref = opt.fn_ref;
@@ -59,7 +64,7 @@ imc_fl = struct(...
 V_o1 = spm_imcalc(V_in, V_o1, 'sum(X)' ,imc_fl);
 % 2/ smooth
 fn_stmp = spm_file(fn_tmp,'prefix','s');
-spm_smooth(V_o1.fname,fn_stmp,[8 8 8]);
+spm_smooth(V_o1.fname,fn_stmp,opt.smoK);
 % 3/ threshold
 fn_ICV = spm_file(fn_ref,'prefix','icv_','number','');
 V_o2 = V_o1;
@@ -75,11 +80,20 @@ delete(fn_tmp), delete(fn_stmp)
 fn_out = fn_ICV;
 
 %% Fixing ICV
-opt_fx_mask.sz_thr = 1000;
-if ~isempty(opt.fn_iwarp)
-    opt_fx_mask.fn_iwarp = opt.fn_iwarp;
+if (~isempty(opt.msk_sz_thr) && opt.msk_sz_thr>0) || ~isempty(opt.fn_iwarp)
+    % proceed with fixing ICV or not, if msk_sz_thr exists and is >0, or if
+    % inverse warp is provided
+    if ~isempty(opt.msk_sz_thr)
+        opt_fx_mask.sz_thr = opt.msk_sz_thr;
+    else
+        opt_fx_mask.sz_thr = 0;
+    end
+    if ~isempty(opt.fn_iwarp)
+        opt_fx_mask.fn_iwarp = opt.fn_iwarp;
+    end
+    % do it
+    crc_fix_ICV(fn_ICV,opt_fx_mask); % overwriting the file fn_ICV
 end
-crc_fix_ICV(fn_ICV,opt_fx_mask); % overwriting the file fn_ICV
 
 %% Warping and smoothing, if requested
 if ~isempty(opt.fn_warp)
@@ -88,10 +102,10 @@ if ~isempty(opt.fn_warp)
     spm_jobman('run', matlabbatch);
     fn_wICV = spm_file(fn_ICV,'prefix','w');
     fn_out = char(fn_out,fn_wICV);
-    if ~isempty(opt.smoK) && all(opt.smoK>0)
+    if ~isempty(opt.wsmoK) && all(opt.wsmoK>0)
         % Smooth a bit
         fn_swICV = spm_file(fn_ICV,'prefix','sw');
-        spm_smooth(fn_wICV,fn_swICV,opt.smoK,2);
+        spm_smooth(fn_wICV,fn_swICV,opt.wsmoK,2);
         fn_out = char(fn_out,fn_swICV);
     end
 end
