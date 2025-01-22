@@ -423,7 +423,7 @@ fn_out.segmImg.c2 = {deblank(fn_Cimg(2,:))}; % WM
 fn_out.segmImg.c3 = {deblank(fn_Cimg(3,:))}; % Lesion
 fn_out.segmImg.c4 = {deblank(fn_Cimg(4,:))}; % CSF
 if numel(NbGaussian)==8 && ~options.rcombGM
-    fn_out.segmImg.c8 = {deblank(fn_Cimg(8,:))}; % GM-BG
+    fn_out.segmImg.c8 = {deblank(fn_Cimg(end,:))}; % GM-BG
 end
 % warped segmented tissues
 fn_out.segmImg.wc1 = {deblank(fn_wCimg(1,:))}; % warped GM
@@ -431,7 +431,7 @@ fn_out.segmImg.wc2 = {deblank(fn_wCimg(2,:))}; % warped WM
 fn_out.segmImg.wc3 = {deblank(fn_wCimg(3,:))}; % warped Lesion
 fn_out.segmImg.wc4 = {deblank(fn_wCimg(4,:))}; % warped CSF
 if numel(NbGaussian)==8 && ~options.rcombGM
-    fn_out.segmImg.wc8 = {deblank(fn_wCimg(8,:))}; % warped GM-BG
+    fn_out.segmImg.wc8 = {deblank(fn_wCimg(end,:))}; % warped GM-BG
 end
 % modulated warped segmented tissues
 fn_out.segmImg.mwc1 = {deblank(fn_mwCimg(1,:))}; % modulated warped GM
@@ -439,14 +439,14 @@ fn_out.segmImg.mwc2 = {deblank(fn_mwCimg(2,:))}; % modulated warped WM
 fn_out.segmImg.mwc3 = {deblank(fn_mwCimg(3,:))}; % modulated warped Lesion
 fn_out.segmImg.mwc4 = {deblank(fn_mwCimg(4,:))}; % modulated warped CSF
 if numel(NbGaussian)==8 && ~options.rcombGM
-    fn_out.segmImg.mwc8 = {deblank(fn_mwCimg(8,:))}; % modulated warped GM-BG
+    fn_out.segmImg.mwc8 = {deblank(fn_mwCimg(end,:))}; % modulated warped GM-BG
 end
 % Dartel ready segmented tissues
 fn_out.segmImg.rc1 = {deblank(fn_rCimg(1,:))}; % modulated warped GM
 fn_out.segmImg.rc2 = {deblank(fn_rCimg(2,:))}; % modulated warped WM
 fn_out.segmImg.rc3 = {deblank(fn_rCimg(3,:))}; % modulated warped Lesion
 if numel(NbGaussian)==8 && ~options.rcombGM
-    fn_out.segmImg.rc8 = {deblank(fn_rCimg(8,:))}; % modulated warped GM-BG
+    fn_out.segmImg.rc8 = {deblank(fn_rCimg(end,:))}; % modulated warped GM-BG
 end
 
 end
