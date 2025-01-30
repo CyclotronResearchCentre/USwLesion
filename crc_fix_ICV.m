@@ -54,11 +54,9 @@ end
 
 %% Remove big blobs outside the biggest one
 [L,num] = spm_bwlabel(v_msk);
-for ii=1:num
-    n_vx = sum(L(:)==ii);
-end
-
-if numel(n_vx)>1
+if num>1
+    n_vx  = zeros(1,num);
+    for ii=1:num, n_vx(ii) = sum(L(:)==ii); end
     [~,s_ind] = sort(n_vx);
     for ii = s_ind(1:end-1) % clear all but the biggest
         v_msk(L==ii) = 0;
