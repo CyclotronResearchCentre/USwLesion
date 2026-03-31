@@ -252,14 +252,18 @@ fn_mwCimg = spm_select('FPList',pth, ...  % modulated warped
 % recombine GM-w/o-BG with GM-BG
 %  -> add c8 onto c1 -> only 1 image (c1) with GM + c8 with GM-BG.
 % Use a specific sub-function to preserve informations!
-if numel(NbGaussian)==8 && options.rcombGM
-    add_2_images(fn_Cimg([1 end],:));
-    add_2_images(fn_rCimg([1 end],:));
-    add_2_images(fn_wCimg([1 end],:));
-    add_2_images(fn_mwCimg([1 end],:));
-    lTC_ICV = 1:4; % ICV includes GM(recombined or full)/WM/Les/CSF
+if numel(NbGaussian)==8 
+    if options.rcombGM
+        add_2_images(fn_Cimg([1 end],:));
+        add_2_images(fn_rCimg([1 end],:));
+        add_2_images(fn_wCimg([1 end],:));
+        add_2_images(fn_mwCimg([1 end],:));
+        lTC_ICV = 1:4; % ICV includes GM(recombined or full)/WM/Les/CSF
+    else
+        lTC_ICV = [1:4 7]; % ICV includes GM/WM/Les/CSF + BG-GM
+    end
 else
-    lTC_ICV = [1:4 7]; % ICV includes GM/WM/Les/CSF + GM-BG
+    lTC_ICV = 1:4; % ICV includes GM (full)/WM/Les/CSF
 end
 
 % Rebuild ICV mask from latest segmentation, with some cleaning up
